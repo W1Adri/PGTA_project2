@@ -1,7 +1,13 @@
 import time
 import threading
+import os 
+import sys
+if sys.platform.startswith("linux"):
+    if os.environ.get("WAYLAND_DISPLAY") or os.environ.get("XDG_SESSION_TYPE") == "wayland":
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
+        os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox --disable-gpu --disable-software-rasterizer"
 
-import webview
+import webview # type: ignore
 
 from connections.api import create_api, start_api_server
 from connections.websocket_handler import start_websocket_server
@@ -10,7 +16,7 @@ from user_actions.user_actions_manager import Actions
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-HTTP_PORT  = 8000
+HTTP_PORT  = 8888
 WS_PORT    = 8765
 APP_TITLE  = "ASTERIX Decoder"
 APP_WIDTH  = 1400
