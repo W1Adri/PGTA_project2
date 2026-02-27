@@ -1,0 +1,203 @@
+/* ── Table panel ─────────────────────────────────────────────────────────── */
+#table-panel {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.table-toolbar-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: auto;
+}
+
+.table-search {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  font-family: var(--sans);
+  font-size: 12px;
+  padding: 5px 10px;
+  width: 200px;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.table-search:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.table-search::placeholder { color: var(--text-dim); }
+
+/* ── Scroll wrapper ──────────────────────────────────────────────────────── */
+.table-scroll {
+  flex: 1;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  background: var(--bg-surface);
+  margin: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+#data-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+#data-table thead { position: sticky; top: 0; z-index: 10; }
+
+#data-table th {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  text-align: left;
+  padding: 9px 13px;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border-light);
+  white-space: nowrap;
+  user-select: none;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+#data-table th:last-child { border-right: none; }
+
+#data-table th:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+#data-table th.sorted-asc::after  { content: ' ↑'; color: var(--accent); }
+#data-table th.sorted-desc::after { content: ' ↓'; color: var(--accent); }
+
+/* ── Rows ────────────────────────────────────────────────────────────────── */
+#data-table tbody tr {
+  border-bottom: 1px solid var(--border-light);
+  transition: background var(--transition);
+}
+
+#data-table tbody tr:hover    { background: var(--accent-light); }
+#data-table tbody tr.selected { background: var(--accent-light); }
+
+#data-table td {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 7px 13px;
+  border-right: 1px solid var(--border-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#data-table td:last-child { border-right: none; }
+
+/* Column-specific styles */
+#data-table td.col-callsign   { color: var(--text-primary); font-weight: 500; }
+#data-table td.col-altitude   { color: var(--accent); }
+#data-table td.col-squawk     { color: var(--green); }
+#data-table td.col-category   { color: var(--text-dim); font-size: 10px; }
+
+/* Alternating rows */
+#data-table tbody tr:nth-child(even) { background: var(--bg-elevated); }
+#data-table tbody tr:nth-child(even):hover { background: var(--accent-light); }
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 8px;
+  padding: 40px;
+  background: var(--bg-surface);
+  margin: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.table-footer {
+  display: flex;
+  align-items: center;
+  padding: 5px 14px;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.table-footer-text {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.table-footer-text span { color: var(--accent); font-weight: 500; }
+
+/* ── Placeholder rows (shown before data loads) ──────────────────────────── */
+.placeholder-row td {
+  padding: 9px 13px;
+  pointer-events: none;
+}
+
+.placeholder-bar {
+  display: block;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--border-light) 25%, var(--bg-hover) 50%, var(--border-light) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+}
+
+/* Vary bar widths per column for a natural look */
+.placeholder-row td:nth-child(1) .placeholder-bar { width: 80%; }
+.placeholder-row td:nth-child(2) .placeholder-bar { width: 50%; }
+.placeholder-row td:nth-child(3) .placeholder-bar { width: 65%; }
+.placeholder-row td:nth-child(4) .placeholder-bar { width: 40%; }
+.placeholder-row td:nth-child(5) .placeholder-bar { width: 55%; }
+.placeholder-row td:nth-child(6) .placeholder-bar { width: 70%; }
+.placeholder-row td:nth-child(7) .placeholder-bar { width: 70%; }
+.placeholder-row td:nth-child(8) .placeholder-bar { width: 45%; }
+.placeholder-row td:nth-child(9) .placeholder-bar { width: 40%; }
+.placeholder-row td:nth-child(10) .placeholder-bar { width: 35%; }
+.placeholder-row td:nth-child(11) .placeholder-bar { width: 60%; }
+
+/* Stagger animation delay row by row */
+.placeholder-row:nth-child(2) .placeholder-bar { animation-delay: 0.1s; }
+.placeholder-row:nth-child(3) .placeholder-bar { animation-delay: 0.2s; }
+.placeholder-row:nth-child(4) .placeholder-bar { animation-delay: 0.3s; }
+.placeholder-row:nth-child(5) .placeholder-bar { animation-delay: 0.4s; }
+.placeholder-row:nth-child(6) .placeholder-bar { animation-delay: 0.5s; }
+.placeholder-row:nth-child(7) .placeholder-bar { animation-delay: 0.1s; }
+.placeholder-row:nth-child(8) .placeholder-bar { animation-delay: 0.2s; }
+.placeholder-row:nth-child(9) .placeholder-bar { animation-delay: 0.3s; }
+.placeholder-row:nth-child(10) .placeholder-bar { animation-delay: 0.4s; }
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

@@ -1,0 +1,121 @@
+/* ── Map panel ───────────────────────────────────────────────────────────── */
+#map-panel {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: var(--bg-base);
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Leaflet overrides (light corporate) ─────────────────────────────────── */
+.leaflet-container {
+  background: #e8ecf0;
+  font-family: var(--sans);
+}
+
+.leaflet-control-attribution {
+  background: rgba(255,255,255,0.85) !important;
+  color: var(--text-dim) !important;
+  font-family: var(--mono) !important;
+  font-size: 9px !important;
+  border-top: 1px solid var(--border) !important;
+}
+
+.leaflet-control-attribution a { color: var(--accent) !important; }
+
+.leaflet-control-zoom {
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.leaflet-control-zoom a {
+  background: var(--bg-surface) !important;
+  color: var(--text-secondary) !important;
+  border-color: var(--border) !important;
+  font-family: var(--sans) !important;
+  font-weight: 500 !important;
+  transition: background var(--transition), color var(--transition) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: var(--bg-hover) !important;
+  color: var(--accent) !important;
+}
+
+/* ── Info box (top-right) ────────────────────────────────────────────────── */
+.map-info-box {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 500;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  min-width: 170px;
+}
+
+.map-info-box .info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 5px;
+}
+
+.map-info-box .info-row:last-child { margin-bottom: 0; }
+.map-info-box .info-val { color: var(--text-primary); font-weight: 500; }
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.map-empty-state {
+  position: absolute;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  gap: 12px;
+  background: var(--bg-base);
+}
+
+.empty-icon {
+  width: 56px;
+  height: 56px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+}
+
+.empty-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+}
+
+.empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.empty-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+}

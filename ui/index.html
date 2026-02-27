@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASTERIX Decoder</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <link rel="stylesheet" href="styles/interface.css">
+  <link rel="stylesheet" href="styles/filters.css">
+  <link rel="stylesheet" href="styles/map.css">
+  <link rel="stylesheet" href="styles/table.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <header id="header">
+
+    <div class="header-logo">
+      <div class="logo-mark"></div>
+      <span class="logo-text">ASTERIX<span>&nbsp;Decoder</span></span>
+    </div>
+
+    <div class="view-toggle">
+      <button class="view-btn" data-view="map">Map</button>
+      <button class="view-btn" data-view="table">Table</button>
+    </div>
+
+    <div class="header-actions">
+      <span class="record-badge">Records:&nbsp;<span class="count" id="record-count">—</span></span>
+      <button class="upload-btn" id="upload-btn">Load File</button>
+    </div>
+
+    <input type="file" id="file-input" accept=".ast,.bin,application/octet-stream">
+  </header>
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div class="sidebar-inner">
+
+      <!-- TIME RANGE -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Time Range</span>
+          <span class="sidebar-section-chevron">&#9660;</span>
+        </div>
+        <div class="sidebar-section-body">
+          <label class="filter-label" for="f-time-start">From</label>
+          <input class="filter-input" type="datetime-local" id="f-time-start" step="1">
+          <label class="filter-label" for="f-time-end">To</label>
+          <input class="filter-input" type="datetime-local" id="f-time-end" step="1">
+        </div>
+      </div>
+
+      <!-- CALLSIGNS -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Callsigns</span>
+          <span class="sidebar-section-chevron">&#9660;</span>
+        </div>
+        <div class="sidebar-section-body">
+          <label class="filter-label">Flight Identifiers</label>
+          <div class="filter-tags" id="f-callsign-tags">
+            <input type="text" id="f-callsign-input" placeholder="Type and press Enter...">
+          </div>
+          <p class="filter-hint">Press Enter or comma to add. Backspace to remove.</p>
+        </div>
+      </div>
+
+      <!-- ALTITUDE -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Altitude</span>
+          <span class="sidebar-section-chevron">&#9660;</span>
+        </div>
+        <div class="sidebar-section-body">
+          <label class="filter-label">Band (feet)</label>
+          <div class="filter-range">
+            <input class="filter-input" type="number" id="f-alt-min" placeholder="Min" min="0" max="60000" step="500">
+            <input class="filter-input" type="number" id="f-alt-max" placeholder="Max" min="0" max="60000" step="500">
+          </div>
+        </div>
+      </div>
+
+      <!-- CATEGORIES -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">ASTERIX Category</span>
+          <span class="sidebar-section-chevron">&#9660;</span>
+        </div>
+        <div class="sidebar-section-body">
+          <div class="filter-check-group" id="f-categories-container">
+            <label class="filter-check-item">
+              <input type="checkbox" data-filter-group="f-categories" value="CAT048" checked>
+              <span class="filter-check-label">CAT048 — Monoradar</span>
+            </label>
+            <label class="filter-check-item">
+              <input type="checkbox" data-filter-group="f-categories" value="CAT062" checked>
+              <span class="filter-check-label">CAT062 — SDPS Track</span>
+            </label>
+            <label class="filter-check-item">
+              <input type="checkbox" data-filter-group="f-categories" value="CAT021" checked>
+              <span class="filter-check-label">CAT021 — ADS-B</span>
+            </label>
+            <label class="filter-check-item">
+              <input type="checkbox" data-filter-group="f-categories" value="CAT010">
+              <span class="filter-check-label">CAT010 — MLAT</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- SQUAWK -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">Squawk</span>
+          <span class="sidebar-section-chevron">&#9660;</span>
+        </div>
+        <div class="sidebar-section-body">
+          <label class="filter-label" for="f-squawk">Mode-A Code(s)</label>
+          <input class="filter-input" type="text" id="f-squawk" placeholder="e.g. 7700, 2000">
+          <p class="filter-hint">Comma-separated. Octal notation.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="apply-btn" id="btn-apply-filters">
+        Apply Filters
+        <span class="filter-count-pill" id="filter-active-count" style="display:none;">0</span>
+      </button>
+      <button class="reset-btn" id="btn-reset-filters">Reset Filters</button>
+    </div>
+  </aside>
+
+  <!-- ── Main ────────────────────────────────────────────────────────────── -->
+  <main id="main">
+
+    <!-- MAP VIEW -->
+    <div class="view-panel" data-view="map" id="map-panel">
+      <div id="map"></div>
+
+      <div class="map-info-box" id="map-info-box">
+        <div class="info-row"><span>Records</span><span class="info-val" data-info="count">—</span></div>
+        <div class="info-row"><span>Start</span><span class="info-val" data-info="t-start">—</span></div>
+        <div class="info-row"><span>End</span><span class="info-val" data-info="t-end">—</span></div>
+      </div>
+
+      <!-- empty state removed — map is always visible -->
+    </div>
+
+    <!-- TABLE VIEW -->
+    <div class="view-panel" data-view="table" id="table-panel">
+
+      <div class="table-toolbar">
+        <span class="table-toolbar-title">Target Reports</span>
+        <input class="table-search" type="text" id="table-search" placeholder="Quick search...">
+      </div>
+
+      <!-- empty state removed — table is always visible -->
+
+      <div class="table-scroll" style="display:none;">
+        <table id="data-table">
+          <thead><tr></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="table-footer">
+        <span class="table-footer-text" id="table-row-count"><span>0</span> records</span>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ── Status bar ──────────────────────────────────────────────────────── -->
+  <footer id="statusbar">
+    <div class="status-item">
+      <div class="status-dot disconnected" id="ws-dot"></div>
+      <span class="status-label">WebSocket</span>
+      <span id="ws-label">Connecting...</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">File:</span>
+      <span id="file-label">No file loaded</span>
+    </div>
+    <div class="status-item" style="margin-left:auto;">
+      <span style="color:var(--text-dim);">ws://127.0.0.1:8765</span>
+    </div>
+  </footer>
+
+</div>
+
+<!-- Drop overlay -->
+<div id="drop-overlay">
+  <div class="drop-box">
+    <div class="drop-title">Drop ASTERIX File</div>
+    <div class="drop-sub">.ast &nbsp;/&nbsp; .bin &nbsp;/&nbsp; any binary format</div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div id="toast-container"></div>
+
+<!-- Scripts — order matters -->
+<script src="js/websocket.js"></script>
+<script src="js/upload.js"></script>
+<script src="js/filters.js"></script>
+<script src="js/map.js"></script>
+<script src="js/table.js"></script>
+<script src="js/views.js"></script>
+
+</body>
+</html>
