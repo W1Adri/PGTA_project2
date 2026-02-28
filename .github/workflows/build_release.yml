@@ -73,15 +73,36 @@ jobs:
           --noconsole
           --name asterix_decoder_${{ matrix.name }}_${{ needs.prepare.outputs.date }}
           --add-data "ui${{ matrix.separator }}ui"
+          --hidden-import uvicorn
+          --hidden-import uvicorn.main
+          --hidden-import uvicorn.config
+          --hidden-import uvicorn.server
           --hidden-import uvicorn.logging
+          --hidden-import uvicorn.loops
           --hidden-import uvicorn.loops.auto
+          --hidden-import uvicorn.loops.asyncio
+          --hidden-import uvicorn.loops.uvloop
+          --hidden-import uvicorn.protocols
+          --hidden-import uvicorn.protocols.http
           --hidden-import uvicorn.protocols.http.auto
+          --hidden-import uvicorn.protocols.http.h11_impl
+          --hidden-import uvicorn.protocols.http.httptools_impl
+          --hidden-import uvicorn.protocols.websockets
           --hidden-import uvicorn.protocols.websockets.auto
+          --hidden-import uvicorn.protocols.websockets.websockets_impl
+          --hidden-import uvicorn.protocols.websockets.wsproto_impl
+          --hidden-import uvicorn.lifespan
           --hidden-import uvicorn.lifespan.on
+          --hidden-import uvicorn.lifespan.off
           --hidden-import starlette.routing
           --hidden-import starlette.staticfiles
           --hidden-import starlette.middleware.cors
+          --hidden-import starlette.middleware.base
+          --hidden-import websockets
+          --hidden-import websockets.legacy
           --hidden-import websockets.legacy.server
+          --hidden-import websockets.legacy.client
+          --collect-all uvicorn
           ${{ matrix.extra_imports }}
           main.py
 
@@ -128,5 +149,4 @@ jobs:
           prerelease: false
           files: |
             dist/*
-            launch_windows.bat
           make_latest: true
