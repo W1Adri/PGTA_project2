@@ -1,12 +1,13 @@
 # pyinstaller/windows.spec
-# Usage: pyinstaller pyinstaller/windows.spec
+# Usage: pyinstaller pyinstaller/windows.spec  (run from project root)
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 import os
 
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(SPEC)))
+
 block_cipher = None
 
-# ── Collect entire packages so nothing is missed ─────────────────────────────
 def safe_collect(package):
     try:
         d, b, h = collect_all(package)
@@ -15,28 +16,25 @@ def safe_collect(package):
         print(f"[WARN] collect_all('{package}') failed: {e}")
         return [], [], []
 
-uv_d,   uv_b,   uv_h   = safe_collect('uvicorn')
-st_d,   st_b,   st_h   = safe_collect('starlette')
-fa_d,   fa_b,   fa_h   = safe_collect('fastapi')
-ws_d,   ws_b,   ws_h   = safe_collect('websockets')
-wv_d,   wv_b,   wv_h   = safe_collect('webview')
-pn_d,   pn_b,   pn_h   = safe_collect('pythonnet')
-cl_d,   cl_b,   cl_h   = safe_collect('clr_loader')
+uv_d, uv_b, uv_h = safe_collect('uvicorn')
+st_d, st_b, st_h = safe_collect('starlette')
+fa_d, fa_b, fa_h = safe_collect('fastapi')
+ws_d, ws_b, ws_h = safe_collect('websockets')
+wv_d, wv_b, wv_h = safe_collect('webview')
+pn_d, pn_b, pn_h = safe_collect('pythonnet')
+cl_d, cl_b, cl_h = safe_collect('clr_loader')
 
 all_datas = (
-    [('ui', 'ui')]
+    [(os.path.join(ROOT, 'ui'), 'ui')]
     + uv_d + st_d + fa_d + ws_d + wv_d + pn_d + cl_d
 )
-
 all_binaries = uv_b + st_b + fa_b + ws_b + wv_b + pn_b + cl_b
-
 all_hidden = (
     uv_h + st_h + fa_h + ws_h + wv_h + pn_h + cl_h
     + collect_submodules('uvicorn')
     + collect_submodules('starlette')
     + collect_submodules('fastapi')
     + collect_submodules('websockets')
-    + collect_submodules('webview')
     + [
         'webview.platforms.winforms',
         'webview.platforms.edgechromium',
@@ -51,8 +49,8 @@ all_hidden = (
 )
 
 a = Analysis(
-    ['main.py'],
-    pathex=['.'],
+    [os.path.join(ROOT, 'main.py')],
+    pathex=[ROOT],
     binaries=all_binaries,
     datas=all_datas,
     hiddenimports=all_hidden,
@@ -76,7 +74,7 @@ exe = EXE(
     name='asterix_decoder',
     debug=False,
     strip=False,
-    upx=False,          # UPX can break Qt DLLs on Windows — keep off
-    console=False,      # no terminal window
+    upx=False,
+    console=False,
     runtime_tmpdir=None,
 )

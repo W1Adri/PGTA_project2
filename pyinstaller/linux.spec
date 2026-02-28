@@ -2,6 +2,8 @@
 # Usage: pyinstaller pyinstaller/linux.spec
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
+import os
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(SPEC)))
 
 block_cipher = None
 
@@ -20,7 +22,7 @@ ws_d, ws_b, ws_h = safe_collect('websockets')
 wv_d, wv_b, wv_h = safe_collect('webview')
 
 all_datas = (
-    [('ui', 'ui')]
+    [(os.path.join(ROOT, 'ui'), 'ui')]
     + uv_d + st_d + fa_d + ws_d + wv_d
 )
 
@@ -45,8 +47,8 @@ all_hidden = (
 )
 
 a = Analysis(
-    ['main.py'],
-    pathex=['.'],
+    [os.path.join(ROOT, 'main.py')],
+    pathex=[ROOT],
     binaries=all_binaries,
     datas=all_datas,
     hiddenimports=all_hidden,
