@@ -54,7 +54,7 @@ def _empty_df() -> pd.DataFrame:
     return df.astype(_DTYPES)
 
 
-class AsterixStore:
+class AsterixPandas:
     """Thread-safe in-memory store for a decoded ASTERIX session."""
 
     def __init__(self):

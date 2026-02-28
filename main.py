@@ -11,7 +11,7 @@ if sys.platform.startswith("linux"):
 import webview
 from connections.api import create_api, start_api_server
 from connections.websocket_handler import start_websocket_server
-from database.asterix_pandas import AsterixStore
+from database.asterix_pandas import AsterixPandas
 from user_actions.user_actions_manager import Actions
 
 
@@ -30,7 +30,7 @@ APP_HEIGHT = 900
 if __name__ == "__main__":
 
     # 1. Shared in-memory store (single source of truth)
-    store = AsterixStore()
+    store = AsterixPandas()
 
     # 2. Action dispatcher (passed to both API and WS layers)
     actions = Actions(store)
