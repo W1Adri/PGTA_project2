@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Get build date
         id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        run: echo "date=$(date +'%Y-%m-%d_%H-%M')" >> $GITHUB_OUTPUT
 
   # ── 2. Build Linux & Windows in parallel ───────────────────────────────────
   build:
@@ -126,4 +126,7 @@ jobs:
             - `asterix_decoder_windows_*.exe` — run on Windows (requires WebView2 runtime)
           draft: false
           prerelease: false
-          files: dist/*
+          files: |
+            dist/*
+            launch_windows.bat
+          make_latest: true
