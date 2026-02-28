@@ -29,15 +29,16 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install uvicorn fastapi starlette websockets python-multipart \
-                      pandas numpy pywebview pyinstaller
+          pip install -r requirements.txt
 
       - name: Verify installs
         run: |
-          python -c "import uvicorn;        print('uvicorn       OK')"
-          python -c "import multipart;      print('multipart     OK')"
-          python -c "import fastapi;        print('fastapi       OK')"
-          python -c "import websockets;     print('websockets    OK')"
+          python -c "import uvicorn;    print('uvicorn    OK')"
+          python -c "import multipart;  print('multipart  OK')"
+          python -c "import fastapi;    print('fastapi    OK')"
+          python -c "import websockets; print('websockets OK')"
+          python -c "import pandas;     print('pandas     OK')"
+          python -c "import webview;    print('webview    OK')"
 
       - name: Build executable
         run: pyinstaller pyinstaller/linux.spec
@@ -63,24 +64,24 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          pip install uvicorn fastapi starlette websockets python-multipart `
-                      pandas numpy pywebview[qt] pythonnet pyinstaller
-        shell: pwsh
+          pip install -r requirements.txt
 
       - name: Verify installs
-        run: |
-          python -c "import uvicorn;        print('uvicorn       OK')"
-          python -c "import multipart;      print('multipart     OK')"
-          python -c "import fastapi;        print('fastapi       OK')"
-          python -c "import websockets;     print('websockets    OK')"
-          python -c "import webview;        print('webview       OK')"
         shell: pwsh
+        run: |
+          python -c "import uvicorn;    print('uvicorn    OK')"
+          python -c "import multipart;  print('multipart  OK')"
+          python -c "import fastapi;    print('fastapi    OK')"
+          python -c "import websockets; print('websockets OK')"
+          python -c "import pandas;     print('pandas     OK')"
+          python -c "import webview;    print('webview    OK')"
 
       - name: Build executable
-        run: pyinstaller pyinstaller/windows.spec
         shell: pwsh
+        run: pyinstaller pyinstaller/windows.spec
 
       - name: Rename binary
         shell: bash
@@ -118,8 +119,8 @@ jobs:
             Automated build from the `release` branch.
 
             **Downloads**
-            - `asterix_decoder_linux_*` — Linux (run `chmod +x` first)
-            - `asterix_decoder_windows_*.exe` — Windows (double-click to run)
+            - `asterix_decoder_linux_*` — Linux (`chmod +x` then run)
+            - `asterix_decoder_windows_*.exe` — Windows (double-click)
           draft: false
           prerelease: false
           files: dist/*
