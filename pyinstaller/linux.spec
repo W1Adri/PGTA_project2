@@ -25,6 +25,7 @@ st_d, st_b, st_h = safe_collect('starlette')
 fa_d, fa_b, fa_h = safe_collect('fastapi')
 ws_d, ws_b, ws_h = safe_collect('websockets')
 wv_d, wv_b, wv_h = safe_collect('webview')
+mp_d, mp_b, mp_h = safe_collect('multipart')       # python-multipart
 
 mp_d, mp_b, mp_h   = safe_collect('multipart')
 mp2_d, mp2_b, mp2_h = safe_collect('python_multipart')

@@ -27,6 +27,7 @@ ws_d, ws_b, ws_h = safe_collect('websockets')
 wv_d, wv_b, wv_h = safe_collect('webview')
 pn_d, pn_b, pn_h = safe_collect('pythonnet')
 cl_d, cl_b, cl_h = safe_collect('clr_loader')
+mp_d, mp_b, mp_h = safe_collect('multipart')       # python-multipart
 
 # python-multipart: collect both possible module names + metadata
 mp_d, mp_b, mp_h = safe_collect('multipart')
