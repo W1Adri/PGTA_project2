@@ -2,17 +2,21 @@ import time
 import threading
 import os 
 import sys
+
 if sys.platform.startswith("linux"):
     if os.environ.get("WAYLAND_DISPLAY") or os.environ.get("XDG_SESSION_TYPE") == "wayland":
         os.environ["QT_QPA_PLATFORM"] = "xcb"
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox --disable-gpu --disable-software-rasterizer"
 
-import webview # type: ignore
-
+import webview
 from connections.api import create_api, start_api_server
 from connections.websocket_handler import start_websocket_server
 from database.asterix_pandas import AsterixStore
 from user_actions.user_actions_manager import Actions
+
+
+
+
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────

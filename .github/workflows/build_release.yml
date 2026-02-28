@@ -1,0 +1,62 @@
+name: Build Release Executables
+
+on:
+  push:
+    branches: [ release ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux
+            separator: ":"
+            ext: ""
+          - os: windows-latest
+            name: windows
+            separator: ";"
+            ext: ".exe"
+
+    runs-on: ${{ matrix.os }}
+    name: Build — ${{ matrix.name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build executable
+        run: >
+          pyinstaller
+          --onefile
+          --noconsole
+          --name asterix_decoder
+          --add-data "ui${{ matrix.separator }}ui"
+          --hidden-import uvicorn.logging
+          --hidden-import uvicorn.loops.auto
+          --hidden-import uvicorn.protocols.http.auto
+          --hidden-import uvicorn.protocols.websockets.auto
+          --hidden-import uvicorn.lifespan.on
+          --hidden-import starlette.routing
+          --hidden-import starlette.staticfiles
+          --hidden-import starlette.middleware.cors
+          --hidden-import websockets.legacy.server
+          main.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: asterix_decoder_${{ matrix.name }}
+          path: dist/asterix_decoder${{ matrix.ext }}
+          retention-days: 90

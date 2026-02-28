@@ -1,5 +1,6 @@
 import uvicorn
-
+import os 
+import sys
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -66,7 +67,7 @@ def create_api(store: AsterixStore, actions: Actions) -> FastAPI:
             raise HTTPException(status_code=500, detail=f"Decode error: {exc}")
 
     # ── Static frontend — MUST be last so API routes take priority ────────────
-    api.mount("/", StaticFiles(directory="ui", html=True), name="ui")
+    api.mount("/", StaticFiles(directory=resource_path("ui"), html=True), name="ui")
 
     return api
 
@@ -80,3 +81,10 @@ def start_api_server(api: FastAPI, port: int) -> None:
         log_level="warning",
     )
     uvicorn.Server(config).run()
+
+
+def resource_path(relative: str) -> str:
+    """Devuelve la ruta correcta tanto en desarrollo como en el ejecutable."""
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative)
+    return os.path.join(os.path.abspath("."), relative)
