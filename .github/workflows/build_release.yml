@@ -25,10 +25,19 @@ jobs:
             name: linux
             separator: ":"
             ext: ""
+            extra_imports: >-
+              --hidden-import webview.platforms.gtk
           - os: windows-latest
             name: windows
             separator: ";"
             ext: ".exe"
+            extra_imports: >-
+              --hidden-import webview.platforms.winforms
+              --hidden-import webview.platforms.edgechromium
+              --hidden-import clr
+              --hidden-import System
+              --hidden-import System.Windows.Forms
+              --collect-all pythonnet
 
     runs-on: ${{ matrix.os }}
     name: Build — ${{ matrix.name }}
@@ -42,11 +51,20 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install dependencies (Linux)
+        if: matrix.name == 'linux'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+
+      - name: Install dependencies (Windows)
+        if: matrix.name == 'windows'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pip install pythonnet pywebview[qt]
 
       - name: Build executable
         run: >
@@ -64,6 +82,7 @@ jobs:
           --hidden-import starlette.staticfiles
           --hidden-import starlette.middleware.cors
           --hidden-import websockets.legacy.server
+          ${{ matrix.extra_imports }}
           main.py
 
       - name: Upload binary as artifact (temp, picked up by release job)
@@ -104,7 +123,7 @@ jobs:
 
             **Downloads**
             - `asterix_decoder_linux_*` — run on Linux (chmod +x required)
-            - `asterix_decoder_windows_*.exe` — run on Windows
+            - `asterix_decoder_windows_*.exe` — run on Windows (requires WebView2 runtime)
           draft: false
           prerelease: false
           files: dist/*
