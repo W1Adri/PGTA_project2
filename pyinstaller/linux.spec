@@ -1,5 +1,5 @@
 # pyinstaller/linux.spec
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(SPEC)))
@@ -13,6 +13,13 @@ def safe_collect(package):
         print(f"[WARN] collect_all('{package}') failed: {e}")
         return [], [], []
 
+def safe_metadata(package):
+    try:
+        return copy_metadata(package)
+    except Exception as e:
+        print(f"[WARN] copy_metadata('{package}') failed: {e}")
+        return []
+
 uv_d, uv_b, uv_h = safe_collect('uvicorn')
 st_d, st_b, st_h = safe_collect('starlette')
 fa_d, fa_b, fa_h = safe_collect('fastapi')
@@ -20,19 +27,33 @@ ws_d, ws_b, ws_h = safe_collect('websockets')
 wv_d, wv_b, wv_h = safe_collect('webview')
 mp_d, mp_b, mp_h = safe_collect('multipart')       # python-multipart
 
+mp_d, mp_b, mp_h   = safe_collect('multipart')
+mp2_d, mp2_b, mp2_h = safe_collect('python_multipart')
+
+multipart_meta = (
+    safe_metadata('python-multipart')
+    + safe_metadata('python_multipart')
+    + safe_metadata('multipart')
+)
+
 all_datas = (
     [(os.path.join(ROOT, 'ui'), 'ui')]
-    + uv_d + st_d + fa_d + ws_d + wv_d + mp_d
+    + uv_d + st_d + fa_d + ws_d + wv_d
+    + mp_d + mp2_d
+    + multipart_meta
 )
-all_binaries = uv_b + st_b + fa_b + ws_b + wv_b + mp_b
+all_binaries = uv_b + st_b + fa_b + ws_b + wv_b + mp_b + mp2_b
 all_hidden = (
-    uv_h + st_h + fa_h + ws_h + wv_h + mp_h
+    uv_h + st_h + fa_h + ws_h + wv_h + mp_h + mp2_h
     + collect_submodules('uvicorn')
     + collect_submodules('starlette')
     + collect_submodules('fastapi')
     + collect_submodules('websockets')
     + collect_submodules('multipart')
     + [
+        'multipart',
+        'multipart.multiparser',
+        'multipart.exceptions',
         'webview.platforms.gtk',
         'multiprocessing',
         'asyncio',

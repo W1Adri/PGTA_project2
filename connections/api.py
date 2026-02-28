@@ -5,11 +5,11 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from database.asterix_pandas import AsterixStore
+from database.asterix_pandas import AsterixPandas
 from user_actions.user_actions_manager import Actions
 
 
-def create_api(store: AsterixStore, actions: Actions) -> FastAPI:
+def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
     """Build and return the configured FastAPI application."""
 
     api = FastAPI(title="ASTERIX Decoder API")
@@ -31,7 +31,7 @@ def create_api(store: AsterixStore, actions: Actions) -> FastAPI:
     async def upload_binary(file: UploadFile = File(...)):
         """
         Receive an ASTERIX binary file (.ast / .bin), decode it, and populate
-        the in-memory AsterixStore.
+        the in-memory AsterixPandas.
 
         Returns a metadata summary so the frontend can update its UI state
         immediately (record count, time range, unique aircraft list, etc.)

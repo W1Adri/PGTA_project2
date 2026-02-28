@@ -1,12 +1,12 @@
 import json
 from websockets.server import WebSocketServerProtocol
 
-from database.asterix_pandas import AsterixStore
+from database.asterix_pandas import AsterixPandas
 
 
 class Actions:
 
-    def __init__(self, store: AsterixStore):
+    def __init__(self, store: AsterixPandas):
         self.store = store
 
     # ── Dispatcher ────────────────────────────────────────────────────────────
