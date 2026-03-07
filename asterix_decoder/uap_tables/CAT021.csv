@@ -1,0 +1,57 @@
+FRN,Data Item,Description,Length in Octets,Formato confirmado
+1,I021/010,Data Source Identification,2,Fixed length
+2,I021/040,Target Report Descriptor,1+,Variable length (extended with FX)
+3,I021/161,Track Number,2,Fixed length
+4,I021/015,Service Identification,1,Fixed length
+5,I021/071,Time of Applicability for Position,3,Fixed length
+6,I021/130,Position in WGS-84 co-ordinates,6,Fixed length
+7,I021/131,"Position in WGS-84 co-ordinates, high res.",8,Fixed length
+FX,-,Field extension indicator,-,FSPEC extension marker
+8,I021/072,Time of Applicability for Velocity,3,Fixed length
+9,I021/150,Air Speed,2,Fixed length
+10,I021/151,True Air Speed,2,Fixed length
+11,I021/080,Target Address,3,Fixed length
+12,I021/073,Time of Message Reception of Position,3,Fixed length
+13,I021/074,Time of Message Reception of Position-High Precision,4,Fixed length
+14,I021/075,Time of Message Reception of Velocity,3,Fixed length
+FX,-,Field extension indicator,-,FSPEC extension marker
+15,I021/076,Time of Message Reception of Velocity-High Precision,4,Fixed length
+16,I021/140,Geometric Height,2,Fixed length
+17,I021/090,Quality Indicators,1+,Variable length (extended with FX)
+18,I021/210,MOPS Version,1,Fixed length
+19,I021/070,Mode 3/A Code,2,Fixed length
+20,I021/230,Roll Angle,2,Fixed length
+21,I021/145,Flight Level,2,Fixed length
+FX,-,Field extension indicator,-,FSPEC extension marker
+22,I021/152,Magnetic Heading,2,Fixed length
+23,I021/200,Target Status,1,Fixed length
+24,I021/155,Barometric Vertical Rate,2,Fixed length
+25,I021/157,Geometric Vertical Rate,2,Fixed length
+26,I021/160,Airborne Ground Vector,4,Fixed length
+27,I021/165,Track Angle Rate,2,Fixed length
+28,I021/077,Time of Report Transmission,3,Fixed length
+FX,-,Field extension indicator,-,FSPEC extension marker
+29,I021/170,Target Identification,6,Fixed length
+30,I021/020,Emitter Category,1,Fixed length
+31,I021/220,Met Information,1+,Compound
+32,I021/146,Selected Altitude,2,Fixed length
+33,I021/148,Final State Selected Altitude,2,Fixed length
+34,I021/110,Trajectory Intent,1+,Compound
+35,I021/016,Service Management,1,Fixed length
+FX,-,Field extension indicator,-,FSPEC extension marker
+36,I021/008,Aircraft Operational Status,1,Fixed length
+37,I021/271,Surface Capabilities and Characteristics,1+,Variable length (extended with FX)
+38,I021/132,Message Amplitude,1,Fixed length
+39,I021/250,Mode S MB Data,1+N*8,Repetitive
+40,I021/260,ACAS Resolution Advisory Report,7,Fixed length
+41,I021/400,Receiver ID,1,Fixed length
+42,I021/295,Data Ages,1+,Compound
+FX,-,Field extension indicator,-,FSPEC extension marker
+43,-,Not Used,-,Not used
+44,-,Not Used,-,Not used
+45,-,Not Used,-,Not used
+46,-,Not Used,-,Not used
+47,-,Not Used,-,Not used
+48,RE,Reserved Expansion Field,1+,Reserved Expansion Field (explicit length)
+49,SP,Special Purpose Field,1+,Special Purpose Field (explicit length)
+FX,-,Field extension indicator,-,FSPEC extension marker
