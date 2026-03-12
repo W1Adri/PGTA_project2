@@ -1,6 +1,7 @@
 from enum import Enum, auto
 from functools import wraps
 from typing import Any, Callable
+from .error_exceptions import AsterixDecodeError
 
 
 # ============================================================
@@ -15,60 +16,120 @@ class LengthType(Enum):
 
 
 # ============================================================
-# EXCEPTION
-# ============================================================
-
-class AsterixDecodeError(Exception):
-    pass
-
-
-# ============================================================
 # DECORATOR
 # ============================================================
 
-def auto_extract_and_decode(func: Callable) -> Callable:
+def extract_octets(func: Callable) -> Callable:
     """
-    Decorator para el método decode() de cada DataItem.
+    Decorator for the decode() method of each DataItem.
 
-    Flujo:
-    1. Mira self.length_type
-    2. Extrae raw_bytes desde coded_bytes usando self.cursor
-    3. Guarda self.raw_bytes
-    4. Guarda self.next_cursor
-    5. Llama al decode real del item con raw_bytes
+    Flow:
+    1. Checks self.length_type
+    2. Extracts raw_bytes from coded_bytes using self.cursor
+    3. Stores self.raw_bytes
+    4. Stores self.next_cursor
+    5. Calls the item's real decode with raw_bytes
     """
     @wraps(func)
-    def wrapper(self: "DataItem", unextracted_bytes: bytes) -> dict[str, Any]:
+    def wrapper(self, unextracted_octets: bytes) -> int:
         if not isinstance(self.length_type, LengthType):
             raise AsterixDecodeError(
-                f"{self.item_id}: length_type inválido -> {self.length_type}"
+                f"{self.item_id}: invalid length_type -> {self.length_type}"
             )
 
         # ---- EXTRACT DEPENDS ON THE TYPE----
         if self.length_type == LengthType.FIXED:
-            raw_bytes, next_cursor = self._extract_fixed(unextracted_bytes)
+            octets, next_cursor = _extract_fixed(
+                unextracted_octets,
+                self.fixed_length,
+            )
 
         elif self.length_type == LengthType.VARIABLE:
-            raw_bytes, next_cursor = self._extract_variable(unextracted_bytes)
+            octets, next_cursor = _extract_variable(unextracted_octets)
 
         elif self.length_type == LengthType.REPETITIVE:
-            raw_bytes, next_cursor = self._extract_repetitive(unextracted_bytes)
+            octets, next_cursor = _extract_repetitive(
+                unextracted_octets,
+                self.repetitive_block_size,
+            )
 
         elif self.length_type == LengthType.COMPOUND:
-            raw_bytes, next_cursor = self.extract_compound(unextracted_bytes)
+            octets, next_cursor = self.extract_compound(unextracted_octets)
 
         else:
             raise AsterixDecodeError(
                 f"{self.item_id}: length_type not supported -> {self.length_type}"
             )
 
-        self.raw_bytes = raw_bytes
+        self.octets = octets
 
-        # Llama al decode REAL del item con los bytes recortados
-        func(self, raw_bytes)
+        # Calls the REAL decode of the item with the trimmed bytes
+        func(self)
 
         return next_cursor
 
     return wrapper
+
+def _extract_fixed(
+    unextracted_octets: bytes,
+    fixed_length: int,
+) -> tuple[bytes, int]:
+
+    if fixed_length > len(unextracted_octets):
+        raise AsterixDecodeError(
+            "Not enough bytes for FIXED"
+        )
+
+    return unextracted_octets[:fixed_length], fixed_length
+
+def _extract_variable(unextracted_octets: bytes) -> tuple[bytes, int]:
+    """
+    Variable length via FX.
+    Reads octet by octet until FX = 0 is found.
+    FX is assumed to be in the least significant bit (bit 1).
+    """
+    
+    pos = 0
+
+    while True:
+        if pos >= len(unextracted_octets):
+            raise AsterixDecodeError(
+                "Unexpected end in VARIABLE"
+            )
+
+        octet = unextracted_octets[pos]
+        pos += 1
+
+        fx = octet & 0x01
+        if fx == 0:
+            break
+
+    return unextracted_octets[:pos], pos
+
+def _extract_repetitive(
+    unextracted_octets: bytes,
+    repetitive_block_size: int,
+) -> tuple[bytes, int]:
+    """
+    Format:
+        [REP][BLOCK][BLOCK][BLOCK]...
+    where each BLOCK has a fixed size of repetitive_block_size
+    """
+
+    if 0 >= len(unextracted_octets):
+        raise AsterixDecodeError(
+            "Missing REP byte"
+        )
+
+    rep = unextracted_octets[0]
+    total_len = 1 + rep * repetitive_block_size
+
+    if total_len > len(unextracted_octets):
+        raise AsterixDecodeError(
+            "Not enough bytes for REPETITIVE"
+        )
+
+    return unextracted_octets[:total_len], total_len
+
 
 
