@@ -66,6 +66,7 @@ class Item020(DataItem):
             
         self._bits_to_data()
             
+            
     def _bits_to_data(self):
         
         ### FIRST OCTET ###

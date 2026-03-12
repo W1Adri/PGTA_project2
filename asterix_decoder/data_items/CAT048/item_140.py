@@ -1,0 +1,37 @@
+from asterix_decoder.data_items.length_type import LengthType, extract_octets
+from asterix_decoder.data_items.data_item import DataItem
+
+class Item140(DataItem):
+
+    @staticmethod
+    def get_item_id() -> str:
+        return "I048/140"
+
+    '''
+        Name:       Time of Day
+        Definition: Absolute time stamping expressed as UTC.
+        Format:     Three-octet fixed length Data Item.
+    '''
+
+    def __init__(self, item_name: str, length_type):
+        super().__init__(item_name, length_type)
+        self.data = {
+            "TIME_SECONDS": None,
+            "TIME_UTC": None,
+        }
+
+    @extract_octets
+    def decode(self, octets: bytes):
+        self.TIME = int.from_bytes(octets, byteorder="big", signed=False)
+        
+        self._bits_to_data()
+
+    def _bits_to_data(self):
+        self.data["TIME_SECONDS"] = self.TIME / 128.0
+        self.data["TIME_UTC"] = self._format_utc_from_seconds(self.TIME / 128.0)
+
+    def _format_utc_from_seconds(self, total_seconds: float) -> str:
+        hours = int(total_seconds // 3600) % 24
+        minutes = int((total_seconds % 3600) // 60)
+        seconds = total_seconds % 60
+        return f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
