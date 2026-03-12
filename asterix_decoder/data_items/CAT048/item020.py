@@ -37,16 +37,16 @@ class Item020(DataItem):
         }
 
     @extract_octets
-    def decode(self):
-                
-        o1 = self.octets[0]
+    def decode(self, octets):
+         
+        o1 = octets[0]
         self.TYP = (o1 >> 5) & 0b111
         self.SIM = (o1 >> 4) & 0b1
         self.RDP = (o1 >> 3) & 0b1
         self.SPI = (o1 >> 2) & 0b1
         self.RAB = (o1 >> 1) & 0b1
 
-        if len(self.octets) >= 2:
+        if len(octets) >= 2:
             o2 = self.octets[1]
             self.TST = (o2 >> 7) & 0b1
             self.ERR = (o2 >> 6) & 0b1
@@ -54,7 +54,7 @@ class Item020(DataItem):
             self.ME = (o2 >> 4) & 0b1
             self.MI = (o2 >> 3) & 0b1
             self.FOE_FRI = (o2 >> 1) & 0b11
-        if len(self.octets) >= 3:
+        if len(octets) >= 3:
             o3 = self.octets[2]
             self.ADSB_EP = (o3 >> 7) & 0b1
             self.ADSB_VAL = (o3 >> 6) & 0b1

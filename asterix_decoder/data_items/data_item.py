@@ -56,19 +56,15 @@ class DataItem(ABC):
         return length_type
 
     @abstractmethod
-    def decode(self, unextracted_octets): 
+    def decode(self, octets): 
         """
-        This method receives the raw bytes extracted according to length_type and decodes them into self.data.
+        This method unextracted_octets as input, extracts the relevant octets with the decorator, decodes them, and stores the decoded values in self.data.
+        The actual extraction logic is handled
         """
         ...
 
     def get_data(self) -> dict[str, Any]:
         return self.data
-
-
-    # --------------------------------------------------------
-    # GENERIC EXTRACTORS
-    # --------------------------------------------------------
 
 
     # --------------------------------------------------------
@@ -85,6 +81,7 @@ class DataItem(ABC):
         
         
 class ItemXXX(DataItem):
+    
     @staticmethod
     def get_item_id() -> str:
         return "IXXX/XXX"
@@ -94,6 +91,6 @@ class ItemXXX(DataItem):
         self.item_id = self.get_item_id()+"-"+item_id
 
     @extract_octets
-    def decode(self, unextracted_octets: bytes):
+    def decode(self, octets: bytes):
         # Implement the decoding logic for this item
         pass

@@ -38,33 +38,39 @@ def extract_octets(func: Callable) -> Callable:
             )
 
         # ---- EXTRACT DEPENDS ON THE TYPE----
-        if self.length_type == LengthType.FIXED:
-            octets, next_cursor = _extract_fixed(
-                unextracted_octets,
-                self.fixed_length,
-            )
+        extract_type = self.length_type.name
+        try:
+            if self.length_type == LengthType.FIXED:
+                octets, next_cursor = _extract_fixed(
+                    unextracted_octets,
+                    self.fixed_length,
+                )
 
-        elif self.length_type == LengthType.VARIABLE:
-            octets, next_cursor = _extract_variable(unextracted_octets)
+            elif self.length_type == LengthType.VARIABLE:
+                octets, next_cursor = _extract_variable(unextracted_octets)
 
-        elif self.length_type == LengthType.REPETITIVE:
-            octets, next_cursor = _extract_repetitive(
-                unextracted_octets,
-                self.repetitive_block_size,
-            )
+            elif self.length_type == LengthType.REPETITIVE:
+                octets, next_cursor = _extract_repetitive(
+                    unextracted_octets,
+                    self.repetitive_block_size,
+                )
 
-        elif self.length_type == LengthType.COMPOUND:
-            octets, next_cursor = self.extract_compound(unextracted_octets)
+            elif self.length_type == LengthType.COMPOUND:
+                octets, next_cursor = self.extract_compound(unextracted_octets)
 
-        else:
+            else:
+                raise AsterixDecodeError(
+                    f"{self.item_id}: length_type not supported -> {self.length_type}"
+                )
+        except AsterixDecodeError as exc:
             raise AsterixDecodeError(
-                f"{self.item_id}: length_type not supported -> {self.length_type}"
-            )
+                f"{self.item_id}: extract_type {extract_type} failed -> {exc}"
+            ) from exc
 
         self.octets = octets
 
         # Calls the REAL decode of the item with the trimmed bytes
-        func(self)
+        func(self, octets)
 
         return next_cursor
 
