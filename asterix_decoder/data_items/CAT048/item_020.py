@@ -14,8 +14,8 @@ class Item020(DataItem):
                     followed by one-octet extents as necessary
     '''
     
-    def __init__(self, item_name: str, length_type):
-        super().__init__(item_name, length_type)
+    def __init__(self, item_name: str, length_str: str):
+        super().__init__(item_name, length_str)
         self.data = {
             "TYP": None,    
             "SIM": None,  
@@ -66,7 +66,7 @@ class Item020(DataItem):
             
         self._bits_to_data()
             
-            
+
     def _bits_to_data(self):
         
         ### FIRST OCTET ###

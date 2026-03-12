@@ -14,8 +14,8 @@ class Item200(DataItem):
         Format:     Four-octet fixed length Data Item.
     '''
 
-    def __init__(self, item_name: str, length_type):
-        super().__init__(item_name, length_type)
+    def __init__(self, item_name: str, length_str: str):
+        super().__init__(item_name, length_str)
         self.data = {
             "GROUNDSPEED_NM_S": None,
             "HEADING_DEG": None,

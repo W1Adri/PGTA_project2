@@ -14,8 +14,8 @@ class Item070(DataItem):
         Format:     Two-octet fixed length Data Item.
     '''
 
-    def __init__(self, item_name: str, length_type):
-        super().__init__(item_name, length_type)
+    def __init__(self, item_name: str, length_str: str):
+        super().__init__(item_name, length_str)
         self.data = {
             "V": None,
             "G": None,

@@ -27,28 +27,25 @@ class Item250(DataItem):
         self.data = {
             "REP": None,
             "BLOCKS": None,
-            "SUPPORTED_BDS_BLOCKS": None,
         }
 
     @extract_octets
     def decode(self, octets: bytes):
         self.REP = octets[0]
-        self.RAW_BLOCKS = []
+        self.BLOCKS = []
         
         pos = 1
         for _ in range(self.REP):
-            block = octets[pos:pos + 8]
-            self.RAW_BLOCKS.append(block)
-            pos += 8
+            block = octets[pos:pos + self.repetitive_block_size]
+            self.BLOCKS.append(block)
+            pos += self.repetitive_block_size
         
         self._bits_to_data()
 
     def _bits_to_data(self):
-        self.data["REP"] = self.REP
         self.data["BLOCKS"] = []
-        self.data["SUPPORTED_BDS_BLOCKS"] = []
 
-        for block in self.RAW_BLOCKS:
+        for block in self.BLOCKS:
             mb_data = block[:7]
             bds_selector = block[7]
             bds1 = (bds_selector >> 4) & 0x0F
@@ -58,10 +55,11 @@ class Item250(DataItem):
             block_info = {
                 "BDS": bds_code,
                 "MB_DATA_HEX": mb_data.hex().upper(),
-                "RAW_BLOCK_HEX": block.hex().upper(),
-                "SUPPORTED": bds_code in self.SUPPORTED_BDS,
             }
 
-            self.data["BLOCKS"].append(block_info)
-            if block_info["SUPPORTED"]:
-                self.data["SUPPORTED_BDS_BLOCKS"].append(block_info)
+            if bds_code in self.SUPPORTED_BDS:
+                block_info = {
+                "BDS": bds_code,
+                "MB_DATA_HEX": mb_data.hex().upper(),
+                }
+                self.data["BLOCKS"].append(block_info)
