@@ -43,9 +43,9 @@ class DataItem(ABC):
         elif (length_str == "1+1+"):
             length_type = LengthType.COMPOUND
         
-        elif (length_str.split("*")[1] == "n"): #example: 1+8*n 
+        elif ("n" in length_str.lower()): #example: 1+8*n 
             length_type = LengthType.REPETITIVE
-            self.repetitive_block_size = int(length_str.split("*n")[0].split("+")[1])
+            self.repetitive_block_size = int(length_str.lower().split("+")[1].replace("n", "").replace("*", "").strip())
             
         try:  
             if length_type==LengthType.FIXED and int(length_str)>0:
@@ -78,6 +78,12 @@ class DataItem(ABC):
         raise NotImplementedError(
             f"{self.item_id}: extract_compound() not implemented"
         )
+    
+    def copy(self) -> DataItem:
+        """
+        Creates a copy of the DataItem instance. Useful for handling repetitions.
+        """
+        return self.__class__(self.item_name, self.length_str)
         
         
 class ItemXXX(DataItem):
