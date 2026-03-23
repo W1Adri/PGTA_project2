@@ -56,73 +56,72 @@ class Item130(DataItem):
         return unextracted_octets[:total_len], total_len
 
     @extract_octets
-    def decode(self, octets: bytes):
-        self.PRIMARY = octets[0]
-        
-        # Store presence flags
-        self.SRL_PRESENT = (self.PRIMARY >> 7) & 0x1
-        self.SRR_PRESENT = (self.PRIMARY >> 6) & 0x1
-        self.SAM_PRESENT = (self.PRIMARY >> 5) & 0x1
-        self.PRL_PRESENT = (self.PRIMARY >> 4) & 0x1
-        self.PAM_PRESENT = (self.PRIMARY >> 3) & 0x1
-        self.RPD_PRESENT = (self.PRIMARY >> 2) & 0x1
-        self.APD_PRESENT = (self.PRIMARY >> 1) & 0x1
-        
-        # Store raw values
+    def decode(self, octets: bytes) -> dict[str, any]:
+        PRIMARY = octets[0]
+
+        SRL_PRESENT = (PRIMARY >> 7) & 0x1
+        SRR_PRESENT = (PRIMARY >> 6) & 0x1
+        SAM_PRESENT = (PRIMARY >> 5) & 0x1
+        PRL_PRESENT = (PRIMARY >> 4) & 0x1
+        PAM_PRESENT = (PRIMARY >> 3) & 0x1
+        RPD_PRESENT = (PRIMARY >> 2) & 0x1
+        APD_PRESENT = (PRIMARY >> 1) & 0x1
+
         pos = 1
-        self.SRL = None
-        self.SRR = None
-        self.SAM = None
-        self.PRL = None
-        self.PAM = None
-        self.RPD = None
-        self.APD = None
-        
-        if self.SRL_PRESENT:
-            self.SRL = octets[pos]
-            pos += 1
-        if self.SRR_PRESENT:
-            self.SRR = octets[pos]
-            pos += 1
-        if self.SAM_PRESENT:
-            self.SAM = octets[pos]
-            pos += 1
-        if self.PRL_PRESENT:
-            self.PRL = octets[pos]
-            pos += 1
-        if self.PAM_PRESENT:
-            self.PAM = octets[pos]
-            pos += 1
-        if self.RPD_PRESENT:
-            self.RPD = octets[pos]
-            pos += 1
-        if self.APD_PRESENT:
-            self.APD_RAW = octets[pos]
-            pos += 1
-        
-        self._bits_to_data()
+        SRL = None
+        SRR = None
+        SAM = None
+        PRL = None
+        PAM = None
+        RPD = None
+        APD = None
 
-    def _bits_to_data(self):
-        if self.SRL is not None:
-            self.data["SRL_DEG"] = self.SRL * 360.0 / 8192.0
+        if SRL_PRESENT:
+            SRL = octets[pos]
+            pos += 1
+        if SRR_PRESENT:
+            SRR = octets[pos]
+            pos += 1
+        if SAM_PRESENT:
+            SAM = octets[pos]
+            pos += 1
+        if PRL_PRESENT:
+            PRL = octets[pos]
+            pos += 1
+        if PAM_PRESENT:
+            PAM = octets[pos]
+            pos += 1
+        if RPD_PRESENT:
+            RPD = octets[pos]
+            pos += 1
+        if APD_PRESENT:
+            APD = octets[pos]
+            pos += 1
 
-        if self.SRR is not None:
-            self.data["SRR"] = self.SRR
+        return self._bits_to_data(self.data.copy(), SRL, SRR, SAM, PRL, PAM, RPD, APD)
 
-        if self.SAM is not None:
-            self.data["SAM_DBM"] = self._twos_complement(self.SAM, 8)
+    def _bits_to_data(self, data, SRL, SRR, SAM, PRL, PAM, RPD, APD) -> dict[str, any]:
+        if SRL is not None:
+            data["SRL_DEG"] = SRL * 360.0 / 8192.0
 
-        if self.PRL is not None:
-            self.data["PRL_DEG"] = self.PRL * 360.0 / 8192.0
+        if SRR is not None:
+            data["SRR"] = SRR
 
-        if self.PAM is not None:
-            self.data["PAM_DBM"] = self._twos_complement(self.PAM, 8)
+        if SAM is not None:
+            data["SAM_DBM"] = self._twos_complement(SAM, 8)
 
-        if self.RPD is not None:
-            self.data["RPD_NM"] = self._twos_complement(self.RPD, 8) / 256.0
+        if PRL is not None:
+            data["PRL_DEG"] = PRL * 360.0 / 8192.0
 
-        if self.APD is not None:
-            self.data["APD_DEG"] = self._twos_complement(self.APD, 8) * 360.0 / 16384.0
+        if PAM is not None:
+            data["PAM_DBM"] = self._twos_complement(PAM, 8)
+
+        if RPD is not None:
+            data["RPD_NM"] = self._twos_complement(RPD, 8) / 256.0
+
+        if APD is not None:
+            data["APD_DEG"] = self._twos_complement(APD, 8) * 360.0 / 16384.0
+        return data
 
 
     def _twos_complement(self, value: int, bits: int) -> int:

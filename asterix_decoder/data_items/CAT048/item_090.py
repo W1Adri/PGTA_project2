@@ -22,29 +22,29 @@ class Item090(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
+    def decode(self, octets: bytes) -> dict[str, any]:
         value = int.from_bytes(octets, byteorder="big", signed=False)
         
-        self.V = (value >> 15) & 0x1
-        self.G = (value >> 14) & 0x1
-        self.FL_BITS = value & 0x3FFF
+        V = (value >> 15) & 0x1
+        G = (value >> 14) & 0x1
+        FL = value & 0x3FFF
         
-        self._bits_to_data()
+        return self._bits_to_data(self.data.copy(), V, G, FL)
 
-    def _bits_to_data(self):
-        self.data["V"] = {
+    def _bits_to_data(self, data, V, G, FL) -> dict[str, any]:
+        data["V"] = {
             0: "Code validated",
             1: "Code not validated",
-        }.get(self.V, "Unknown")
+        }.get(V, "Unknown")
 
-        self.data["G"] = {
+        data["G"] = {
             0: "Default",
             1: "Garbled code",
-        }.get(self.G, "Unknown")
+        }.get(G, "Unknown")
 
-        fl_signed = self._twos_complement(self.FL_BITS, 14)
-        self.data["FL"] = fl_signed / 4.0
-
+        fl_signed = self._twos_complement(FL, 14)
+        data["FL"] = fl_signed / 4.0
+        return data
     
     def _twos_complement(self, value: int, bits: int) -> int:
         if value & (1 << (bits - 1)):

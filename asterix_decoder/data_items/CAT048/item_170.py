@@ -30,76 +30,79 @@ class Item170(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
+    def decode(self, octets: bytes) -> dict[str, any]:
         o1 = octets[0]
         
-        self.CNF = (o1 >> 7) & 0x1
-        self.RAD = (o1 >> 5) & 0x3
-        self.DOU = (o1 >> 4) & 0x1
-        self.MAH = (o1 >> 3) & 0x1
-        self.CDM = (o1 >> 1) & 0x3
+        CNF = (o1 >> 7) & 0x1
+        RAD = (o1 >> 5) & 0x3
+        DOU = (o1 >> 4) & 0x1
+        MAH = (o1 >> 3) & 0x1
+        CDM = (o1 >> 1) & 0x3
+
+        TRE = GHO = SUP = TCC = None
 
         if len(octets) >= 2:
             o2 = octets[1]
-            self.TRE = (o2 >> 7) & 0x1
-            self.GHO = (o2 >> 6) & 0x1
-            self.SUP = (o2 >> 5) & 0x1
-            self.TCC = (o2 >> 4) & 0x1
-        
-        self._bits_to_data()
+            TRE = (o2 >> 7) & 0x1
+            GHO = (o2 >> 6) & 0x1
+            SUP = (o2 >> 5) & 0x1
+            TCC = (o2 >> 4) & 0x1
 
-    def _bits_to_data(self):
+        return self._bits_to_data(self.data.copy(), len(octets), CNF, RAD, DOU, MAH, CDM, TRE, GHO, SUP, TCC)
+
+    def _bits_to_data(self, data, OCTETS_LEN, CNF, RAD, DOU, MAH, CDM, TRE, GHO, SUP, TCC) -> dict[str, any]:
         ### FIRST OCTET ###
-        self.data["CNF"] = {
+        data["CNF"] = {
             0: "Confirmed Track",
             1: "Tentative Track",
-        }.get(self.CNF, "Unknown")
+        }.get(CNF, "Unknown")
 
-        self.data["RAD"] = {
+        data["RAD"] = {
             0b00: "Combined Track",
             0b01: "PSR Track",
             0b10: "SSR/Mode S Track",
             0b11: "Invalid",
-        }.get(self.RAD, "Unknown")
+        }.get(RAD, "Unknown")
 
-        self.data["DOU"] = {
+        data["DOU"] = {
             0: "Normal confidence",
             1: "Low confidence in plot to track association",
-        }.get(self.DOU, "Unknown")
+        }.get(DOU, "Unknown")
 
-        self.data["MAH"] = {
+        data["MAH"] = {
             0: "No horizontal man. sensed",
             1: "Horizontal man. sensed",
-        }.get(self.MAH, "Unknown")
+        }.get(MAH, "Unknown")
 
-        self.data["CDM"] = {
+        data["CDM"] = {
             0b00: "Maintaining",
             0b01: "Climbing",
             0b10: "Descending",
             0b11: "Unknown",
-        }.get(self.CDM, "Unknown")
+        }.get(CDM, "Unknown")
 
         ### SECOND OCTET ###
-        if len(self.octets) == 1:
-            return
+        if OCTETS_LEN == 1:
+            return data
         
-        self.data["TRE"] = {
+        data["TRE"] = {
             0: "Track still alive",
             1: "End of track lifetime (last report for this track)",
-        }.get(self.TRE, "Unknown")
+        }.get(TRE, "Unknown")
 
-        self.data["GHO"] = {
+        data["GHO"] = {
             0: "True target track",
             1: "Ghost target track",
-        }.get(self.GHO, "Unknown")
+        }.get(GHO, "Unknown")
 
-        self.data["SUP"] = {
+        data["SUP"] = {
             0: "No",
             1: "Yes",
-        }.get(self.SUP, "Unknown")
+        }.get(SUP, "Unknown")
 
-        self.data["TCC"] = {
+        data["TCC"] = {
             0: "Tracking performed in Radar Plane",
             1: "Slant range correction and projection into a 2D reference plane applied",
-        }.get(self.TCC, "Unknown")
+        }.get(TCC, "Unknown")
+        return data
 

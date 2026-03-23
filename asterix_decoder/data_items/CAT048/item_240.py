@@ -21,18 +21,18 @@ class Item240(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
-        self.VALUE = int.from_bytes(octets, byteorder="big", signed=False)
-        
-        self._bits_to_data()
+    def decode(self, octets: bytes) -> dict[str, any]:
+        VALUE = int.from_bytes(octets, byteorder="big", signed=False)
+        return self._bits_to_data(self.data.copy(), VALUE)
 
-    def _bits_to_data(self):
+    def _bits_to_data(self, data, VALUE) -> dict[str, any]:
         chars = []
         for shift in range(42, -1, -6):
-            code = (self.VALUE >> shift) & 0x3F
+            code = (VALUE >> shift) & 0x3F
             chars.append(self._decode_ia5_six_bit_char(code))
 
-        self.data["AIRCRAFT_ID"] = "".join(chars).strip()
+        data["AIRCRAFT_ID"] = "".join(chars).strip()
+        return data
 
         
     def _decode_ia5_six_bit_char(self, value: int) -> str:

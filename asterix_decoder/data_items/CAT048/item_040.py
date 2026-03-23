@@ -22,12 +22,12 @@ class Item040(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
-        self.RHO = int.from_bytes(octets[0:2], byteorder="big", signed=False)
-        self.THETA = int.from_bytes(octets[2:4], byteorder="big", signed=False)
-        
-        self._bits_to_data()
+    def decode(self, octets: bytes) -> dict[str, any]:
+        RHO = int.from_bytes(octets[0:2], byteorder="big", signed=False)
+        THETA = int.from_bytes(octets[2:4], byteorder="big", signed=False)
+        return self._bits_to_data(self.data.copy(), RHO, THETA)
 
-    def _bits_to_data(self):
-        self.data["RHO_NM"] = self.RHO / 256.0
-        self.data["THETA_DEG"] = self.THETA * 360.0 / 65536.0
+    def _bits_to_data(self, data, RHO, THETA) -> dict[str, any]:
+        data["RHO_NM"] = RHO / 256.0
+        data["THETA_DEG"] = THETA * 360.0 / 65536.0
+        return data

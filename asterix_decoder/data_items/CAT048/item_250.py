@@ -30,36 +30,38 @@ class Item250(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
-        self.REP = octets[0]
-        self.BLOCKS = []
+    def decode(self, octets: bytes) -> dict[str, any]:
+        REP = octets[0]
+        BLOCKS = []
         
         pos = 1
-        for _ in range(self.REP):
-            block = octets[pos:pos + self.repetitive_block_size]
-            self.BLOCKS.append(block)
+        for _ in range(REP):
+            BLOCK = octets[pos:pos + self.repetitive_block_size]
+            BLOCKS.append(BLOCK)
             pos += self.repetitive_block_size
-        
-        self._bits_to_data()
+        return self._bits_to_data(self.data.copy(), BLOCKS)
 
-    def _bits_to_data(self):
-        self.data["BLOCKS"] = []
+    def _bits_to_data(self, data, BLOCKS) -> dict[str, any]:
+        data["REP"] = len(BLOCKS)
+        data["BLOCKS"] = []
 
-        for block in self.BLOCKS:
-            mb_data = block[:7]
-            bds_selector = block[7]
-            bds1 = (bds_selector >> 4) & 0x0F
-            bds2 = bds_selector & 0x0F
-            bds_code = f"{bds1}.{bds2}"
+        for BLOCK in BLOCKS:
+            MB_DATA = BLOCK[:7]
+            BDS_SELECTOR = BLOCK[7]
+            BDS1 = (BDS_SELECTOR >> 4) & 0x0F
+            BDS2 = BDS_SELECTOR & 0x0F
+            BDS_CODE = f"{BDS1}.{BDS2}"
 
             block_info = {
-                "BDS": bds_code,
-                "MB_DATA_HEX": mb_data.hex().upper(),
+                "BDS": BDS_CODE,
+                "MB_DATA_HEX": MB_DATA.hex().upper(),
             }
 
-            if bds_code in self.SUPPORTED_BDS:
+            if BDS_CODE in self.SUPPORTED_BDS:
                 block_info = {
-                "BDS": bds_code,
-                "MB_DATA_HEX": mb_data.hex().upper(),
+                "BDS": BDS_CODE,
+                "MB_DATA_HEX": MB_DATA.hex().upper(),
                 }
-                self.data["BLOCKS"].append(block_info)
+                data["BLOCKS"].append(block_info)
+
+        return data

@@ -37,40 +37,62 @@ class Item020(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets):
+    def decode(self, octets) -> dict[str, any]:
          
         o1 = octets[0]
-        self.TYP = (o1 >> 5) & 0b111
-        self.SIM = (o1 >> 4) & 0b1
-        self.RDP = (o1 >> 3) & 0b1
-        self.SPI = (o1 >> 2) & 0b1
-        self.RAB = (o1 >> 1) & 0b1
+        TYP = (o1 >> 5) & 0b111
+        SIM = (o1 >> 4) & 0b1
+        RDP = (o1 >> 3) & 0b1
+        SPI = (o1 >> 2) & 0b1
+        RAB = (o1 >> 1) & 0b1
+
+        TST = ERR = XPP = ME = MI = FOE_FRI = None
+        ADSB_EP = ADSB_VAL = SCN_EP = SCN_VAL = PA_EP = PA_VAL = None
 
         if len(octets) >= 2:
-            o2 = self.octets[1]
-            self.TST = (o2 >> 7) & 0b1
-            self.ERR = (o2 >> 6) & 0b1
-            self.XPP = (o2 >> 5) & 0b1
-            self.ME = (o2 >> 4) & 0b1
-            self.MI = (o2 >> 3) & 0b1
-            self.FOE_FRI = (o2 >> 1) & 0b11
+            o2 = octets[1]
+            TST = (o2 >> 7) & 0b1
+            ERR = (o2 >> 6) & 0b1
+            XPP = (o2 >> 5) & 0b1
+            ME = (o2 >> 4) & 0b1
+            MI = (o2 >> 3) & 0b1
+            FOE_FRI = (o2 >> 1) & 0b11
         if len(octets) >= 3:
-            o3 = self.octets[2]
-            self.ADSB_EP = (o3 >> 7) & 0b1
-            self.ADSB_VAL = (o3 >> 6) & 0b1
-            self.SCN_EP = (o3 >> 5) & 0b1
-            self.SCN_VAL = (o3 >> 4) & 0b1
-            self.PA_EP = (o3 >> 3) & 0b1
-            self.PA_VAL = (o3 >> 2) & 0b1
-            self.SPARE = (o3 >> 1) & 0b1 #This must be 0
-            
-        self._bits_to_data()
+            o3 = octets[2]
+            ADSB_EP = (o3 >> 7) & 0b1
+            ADSB_VAL = (o3 >> 6) & 0b1
+            SCN_EP = (o3 >> 5) & 0b1
+            SCN_VAL = (o3 >> 4) & 0b1
+            PA_EP = (o3 >> 3) & 0b1
+            PA_VAL = (o3 >> 2) & 0b1
+
+        return self._bits_to_data(
+            self.data.copy(),
+            len(octets),
+            TYP,
+            SIM,
+            RDP,
+            SPI,
+            RAB,
+            TST,
+            ERR,
+            XPP,
+            ME,
+            MI,
+            FOE_FRI,
+            ADSB_EP,
+            ADSB_VAL,
+            SCN_EP,
+            SCN_VAL,
+            PA_EP,
+            PA_VAL,
+        )
             
 
-    def _bits_to_data(self):
+    def _bits_to_data(self, data, OCTETS_LEN, TYP, SIM, RDP, SPI, RAB, TST, ERR, XPP, ME, MI, FOE_FRI, ADSB_EP, ADSB_VAL, SCN_EP, SCN_VAL, PA_EP, PA_VAL) -> dict[str, any]:
         
         ### FIRST OCTET ###
-        self.data["TYP"] = {
+        data["TYP"] = {
             0b000: "No detection",
             0b001: "Single PSR detection",
             0b010: "Single SSR detection",
@@ -79,97 +101,98 @@ class Item020(DataItem):
             0b101: "Single ModeS Roll-Call",
             0b110: "ModeS All-Call + PSR",
             0b111: "ModeS Roll-Call + PSR",
-        }.get(self.TYP, "Unknown")
+        }.get(TYP, "Unknown")
         
-        self.data["SIM"] = {
+        data["SIM"] = {
             0b0: "Actual target report",
             0b1: "Simulated target report",
-        }.get(self.SIM, "Unknown")
+        }.get(SIM, "Unknown")
         
-        self.data["RDP"] = {
+        data["RDP"] = {
             0b0: "Report from RDP Chain 1",
             0b1: "Report from RDP Chain 2",
-        }.get(self.RDP, "Unknown")
+        }.get(RDP, "Unknown")
         
-        self.data["SPI"] = {
+        data["SPI"] = {
             0b0: "Absence of SPI",
             0b1: "Special Position Identification",
-        }.get(self.SPI, "Unknown")
+        }.get(SPI, "Unknown")
         
-        self.data["RAB"] = {
+        data["RAB"] = {
             0b0: "Report from aircraft transponder",
             0b1: "Report from field monitor (fixed transponder)",
-        }.get(self.RAB, "Unknown")
+        }.get(RAB, "Unknown")
         
         ### SECOND OCTET ###
-        if len(self.octets) == 1:
-            return
+        if OCTETS_LEN == 1:
+            return data
 
-        self.data["TST"] = {
+        data["TST"] = {
             0b0: "Real target report",
             0b1: "Test target report",
-        }.get(self.TST, "Unknown")
+        }.get(TST, "Unknown")
 
-        self.data["ERR"] = {
+        data["ERR"] = {
             0b0: "No Extended Range",
             0b1: "Extended Range present",
-        }.get(self.ERR, "Unknown")
+        }.get(ERR, "Unknown")
 
-        self.data["XPP"] = {
+        data["XPP"] = {
             0b0: "No X-Pulse present",
             0b1: "X-Pulse present",
-        }.get(self.XPP, "Unknown")
+        }.get(XPP, "Unknown")
 
-        self.data["ME"] = {
+        data["ME"] = {
             0b0: "No military emergency",
             0b1: "Military emergency",
-        }.get(self.ME, "Unknown")
+        }.get(ME, "Unknown")
 
-        self.data["MI"] = {
+        data["MI"] = {
             0b0: "No military identification",
             0b1: "Military identification",
-        }.get(self.MI, "Unknown")
+        }.get(MI, "Unknown")
         
-        self.data["FOE_FRI"] = {
+        data["FOE_FRI"] = {
             0b00: "No Mode 4 interrogation",
             0b01: "Freindly target",
             0b10: "Unknown target",
             0b11: "No reply",
-        }.get(self.FOE_FRI, "Unknown")
+        }.get(FOE_FRI, "Unknown")
 
         ### THIRD OCTET ###
-        if len(self.octets) == 2:
-            return
+        if OCTETS_LEN == 2:
+            return data
         
-        self.data["ADSB_EP"] = {
+        data["ADSB_EP"] = {
             0b0: "ADSB not populated",
             0b1: "ADSB populated",
-        }.get(self.ADSB_EP, "Unknown")
+        }.get(ADSB_EP, "Unknown")
         
-        self.data["ADSB_VAL"] = {
+        data["ADSB_VAL"] = {
             0b0: "not available",
             0b1: "available",
-        }.get(self.ADSB_VAL, "Unknown")
+        }.get(ADSB_VAL, "Unknown")
         
-        self.data["SCN_EP"] = {
+        data["SCN_EP"] = {
             0b0: "SCN not populated",
             0b1: "SCN populated",
-        }.get(self.SCN_EP, "Unknown")
+        }.get(SCN_EP, "Unknown")
         
-        self.data["SCN_VAL"] = {
+        data["SCN_VAL"] = {
             0b0: "not available",
             0b1: "available",
-        }.get(self.SCN_VAL, "Unknown")
+        }.get(SCN_VAL, "Unknown")
         
-        self.data["PA_EP"] = {
+        data["PA_EP"] = {
             0b0: "PA not populated",
             0b1: "PA populated",
-        }.get(self.PA_EP, "Unknown")    
+        }.get(PA_EP, "Unknown")    
         
-        self.data["PA_VAL"] = {
+        data["PA_VAL"] = {
             0b0: "not available",
             0b1: "available",
-        }.get(self.PA_VAL, "Unknown")
+        }.get(PA_VAL, "Unknown")
+        return data
         
         
 

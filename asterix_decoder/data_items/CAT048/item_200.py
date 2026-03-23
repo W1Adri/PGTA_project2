@@ -22,14 +22,14 @@ class Item200(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
-        self.GROUNDSPEED = int.from_bytes(octets[0:2], byteorder="big", signed=False)
-        self.HEADING = int.from_bytes(octets[2:4], byteorder="big", signed=False)
-        
-        self._bits_to_data()
+    def decode(self, octets: bytes) -> dict[str, any]:
+        GROUNDSPEED = int.from_bytes(octets[0:2], byteorder="big", signed=False)
+        HEADING = int.from_bytes(octets[2:4], byteorder="big", signed=False)
+        return self._bits_to_data(self.data.copy(), GROUNDSPEED, HEADING)
 
-    def _bits_to_data(self):
-        groundspeed_nm_s = self.GROUNDSPEED / float(1 << 14)
+    def _bits_to_data(self, data, GROUNDSPEED, HEADING) -> dict[str, any]:
+        GROUNDSPEED_NM_S = GROUNDSPEED / float(1 << 14)
 
-        self.data["GROUNDSPEED_NM_S"] = groundspeed_nm_s
-        self.data["HEADING_DEG"] = self.HEADING * 360.0 / 65536.0
+        data["GROUNDSPEED_NM_S"] = GROUNDSPEED_NM_S
+        data["HEADING_DEG"] = HEADING * 360.0 / 65536.0
+        return data

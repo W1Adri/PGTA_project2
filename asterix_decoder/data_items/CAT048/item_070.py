@@ -24,34 +24,34 @@ class Item070(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
+    def decode(self, octets: bytes) -> dict[str, any]:
         value = int.from_bytes(octets, byteorder="big", signed=False)
         
-        self.V = (value >> 15) & 0x1
-        self.G = (value >> 14) & 0x1
-        self.L = (value >> 13) & 0x1
-        self.CODE_BITS = value & 0x0FFF
-        
-        self._bits_to_data()
+        V = (value >> 15) & 0x1
+        G = (value >> 14) & 0x1
+        L = (value >> 13) & 0x1
+        CODE_BITS = value & 0x0FFF
+        return self._bits_to_data(self.data.copy(), V, G, L, CODE_BITS)
 
-    def _bits_to_data(self):
-        self.data["V"] = {
+    def _bits_to_data(self, data, V, G, L, CODE_BITS) -> dict[str, any]:
+        data["V"] = {
             0: "Code validated",
             1: "Code not validated",
-        }.get(self.V, "Unknown")
+        }.get(V, "Unknown")
 
-        self.data["G"] = {
+        data["G"] = {
             0: "Default",
             1: "Garbled code",
-        }.get(self.G, "Unknown")
+        }.get(G, "Unknown")
 
-        self.data["L"] = {
+        data["L"] = {
             0: "Mode-3/A code derived from the reply of the transponder",
             1: "Mode-3/A code not extracted during the last scan",
-        }.get(self.L, "Unknown")
+        }.get(L, "Unknown")
 
-        a = (self.CODE_BITS >> 9) & 0x7
-        b = (self.CODE_BITS >> 6) & 0x7
-        c = (self.CODE_BITS >> 3) & 0x7
-        d = self.CODE_BITS & 0x7
-        self.data["MODE_3A_CODE"] = f"{a}{b}{c}{d}"
+        a = (CODE_BITS >> 9) & 0x7
+        b = (CODE_BITS >> 6) & 0x7
+        c = (CODE_BITS >> 3) & 0x7
+        d = CODE_BITS & 0x7
+        data["MODE_3A_CODE"] = f"{a}{b}{c}{d}"
+        return data

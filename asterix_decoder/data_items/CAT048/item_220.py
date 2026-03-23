@@ -22,11 +22,11 @@ class Item220(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
-        self.ADDRESS = int.from_bytes(octets, byteorder="big", signed=False)
-        
-        self._bits_to_data()
+    def decode(self, octets: bytes) -> dict[str, any]:
+        ADDRESS = int.from_bytes(octets, byteorder="big", signed=False)
+        return self._bits_to_data(self.data.copy(), ADDRESS)
 
-    def _bits_to_data(self):
-        self.data["ADDRESS_INT"] = self.ADDRESS
-        self.data["ADDRESS_HEX"] = f"{self.ADDRESS:06X}"
+    def _bits_to_data(self, data, ADDRESS) -> dict[str, any]:
+        data["ADDRESS_INT"] = ADDRESS
+        data["ADDRESS_HEX"] = f"{ADDRESS:06X}"
+        return data

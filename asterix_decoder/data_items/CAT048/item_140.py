@@ -21,14 +21,14 @@ class Item140(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
-        self.TIME = int.from_bytes(octets, byteorder="big", signed=False)
-        
-        self._bits_to_data()
+    def decode(self, octets: bytes) -> dict[str, any]:
+        TIME = int.from_bytes(octets, byteorder="big", signed=False)
+        return self._bits_to_data(self.data.copy(), TIME)
 
-    def _bits_to_data(self):
-        self.data["TIME_SECONDS"] = self.TIME / 128.0
-        self.data["TIME_UTC"] = self._format_utc_from_seconds(self.TIME / 128.0)
+    def _bits_to_data(self, data, TIME) -> dict[str, any]:
+        data["TIME_SECONDS"] = TIME / 128.0
+        data["TIME_UTC"] = self._format_utc_from_seconds(TIME / 128.0)
+        return data
 
     def _format_utc_from_seconds(self, total_seconds: float) -> str:
         hours = int(total_seconds // 3600) % 24

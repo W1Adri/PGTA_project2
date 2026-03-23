@@ -67,12 +67,10 @@ def extract_octets(func: Callable) -> Callable:
                 f"{self.item_id}: extract_type {extract_type} failed -> {exc}"
             ) from exc
 
-        self.octets = octets
-
         # Calls the REAL decode of the item with the trimmed bytes
-        func(self, octets)
+        decoded_data = func(self, octets)
 
-        return next_cursor
+        return next_cursor, decoded_data
 
     return wrapper
 

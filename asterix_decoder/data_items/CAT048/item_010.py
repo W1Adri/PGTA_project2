@@ -22,12 +22,12 @@ class Item010(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
-        self.SAC = octets[0]
-        self.SIC = octets[1]
-        
-        self._bits_to_data()
+    def decode(self, octets: bytes) -> dict[str, any]:
+        SAC = octets[0]
+        SIC = octets[1]
+        return self._bits_to_data(self.data.copy(), SAC, SIC)
     
-    def _bits_to_data(self):
-        self.data["SAC"] = self.SAC
-        self.data["SIC"] = self.SIC
+    def _bits_to_data(self, data, SAC, SIC) -> dict[str, any]:
+        data["SAC"] = SAC
+        data["SIC"] = SIC
+        return data

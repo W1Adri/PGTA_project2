@@ -29,22 +29,22 @@ class Item230(DataItem):
         }
 
     @extract_octets
-    def decode(self, octets: bytes):
+    def decode(self, octets: bytes) -> dict[str, any]:
         value = int.from_bytes(octets, byteorder="big", signed=False)
         
-        self.COM = (value >> 13) & 0x7
-        self.STAT = (value >> 10) & 0x7
-        self.SI = (value >> 9) & 0x1
-        self.MSSC = (value >> 7) & 0x1
-        self.ARC = (value >> 6) & 0x1
-        self.AIC = (value >> 5) & 0x1
-        self.B1A = (value >> 4) & 0x1
-        self.B1B = value & 0x0F
-        
-        self._bits_to_data()
+        COM = (value >> 13) & 0x7
+        STAT = (value >> 10) & 0x7
+        SI = (value >> 9) & 0x1
+        MSSC = (value >> 7) & 0x1
+        ARC = (value >> 6) & 0x1
+        AIC = (value >> 5) & 0x1
+        B1A = (value >> 4) & 0x1
+        B1B = value & 0x0F
 
-    def _bits_to_data(self):
-        self.data["COM"] = {
+        return self._bits_to_data(self.data.copy(), COM, STAT, SI, MSSC, ARC, AIC, B1A, B1B)
+
+    def _bits_to_data(self, data, COM, STAT, SI, MSSC, ARC, AIC, B1A, B1B) -> dict[str, any]:
+        data["COM"] = {
             0: "No communications capability (surveillance only)",
             1: "Comm. A and Comm. B capability",
             2: "Comm. A, Comm. B and Uplink ELM",
@@ -53,9 +53,9 @@ class Item230(DataItem):
             5: "Not assigned",
             6: "Not assigned",
             7: "Not assigned",
-        }.get(self.COM, "Unknown")
+        }.get(COM, "Unknown")
 
-        self.data["STAT"] = {
+        data["STAT"] = {
             0: "No alert, no SPI, aircraft airborne",
             1: "No alert, no SPI, aircraft on ground",
             2: "Alert, no SPI, aircraft airborne",
@@ -64,27 +64,28 @@ class Item230(DataItem):
             5: "No alert, SPI, aircraft airborne or on ground",
             6: "Not assigned",
             7: "Unknown",
-        }.get(self.STAT, "Unknown")
+        }.get(STAT, "Unknown")
 
-        self.data["SI"] = {
+        data["SI"] = {
             0: "SI-Code Capable",
             1: "II-Code Capable",
-        }.get(self.SI, "Unknown")
+        }.get(SI, "Unknown")
 
-        self.data["MSSC"] = {
+        data["MSSC"] = {
             0: "No",
             1: "Yes",
-        }.get(self.MSSC, "Unknown")
+        }.get(MSSC, "Unknown")
 
-        self.data["ARC"] = {
+        data["ARC"] = {
             0: "100 ft resolution",
             1: "25 ft resolution",
-        }.get(self.ARC, "Unknown")
+        }.get(ARC, "Unknown")
 
-        self.data["AIC"] = {
+        data["AIC"] = {
             0: "No",
             1: "Yes",
-        }.get(self.AIC, "Unknown")
+        }.get(AIC, "Unknown")
 
-        self.data["B1A"] = self.B1A
-        self.data["B1B"] = self.B1B
+        data["B1A"] = B1A
+        data["B1B"] = B1B
+        return data
