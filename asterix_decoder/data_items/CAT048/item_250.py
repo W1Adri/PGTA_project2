@@ -13,11 +13,12 @@ class Item250(DataItem):
         Definition: Repetitive Mode S Comm-B payloads.
         Format:     REP + N blocks of 8 octets.
 
-        Project scope taken from the uploaded guide:
-        - Only BDS 4.0, 5.0 and 6.0 are explicitly requested.
-        - The guide does not include the bit layout of those BDS registers, so this
-          item extracts the repetitions, identifies the BDS register, and surfaces
-          the raw MB payload for the supported BDS values.
+        Decoded registers (per the Mode S DAPs Implementation & Operations Guidance):
+          · BDS 4.0 – Selected Vertical Intention
+          · BDS 5.0 – Track and Turn Report
+          · BDS 6.0 – Heading and Speed Report
+
+        Bit helpers use 1-based indexing with MSB = bit 1.
     '''
 
     SUPPORTED_BDS = {"4.0", "5.0", "6.0"}
@@ -25,43 +26,306 @@ class Item250(DataItem):
     def __init__(self, item_name: str, length_type):
         super().__init__(item_name, length_type)
         self.data = {
-            "REP": None,
-            "BLOCKS": None,
+            "MCP_ALTITUDE_STATUS":        None,
+            "MCP_ALTITUDE_FT":            None,
+            "FMS_ALTITUDE_STATUS":        None,
+            "FMS_ALTITUDE_FT":            None,
+            "BARO_SETTING_STATUS":        None,
+            "BARO_SETTING_MB":            None,
+            "VNAV_MODE":                  None,
+            "ALT_HOLD_MODE":              None,
+            "APPROACH_MODE":              None,
+            "TARGET_ALT_SOURCE_STATUS":   None,
+            "TARGET_ALT_SOURCE":          None,
+            "ROLL_ANGLE_STATUS":          None,
+            "ROLL_ANGLE_DEG":             None,
+            "TRUE_TRACK_ANGLE_STATUS":    None,
+            "TRUE_TRACK_ANGLE_DEG":       None,
+            "GROUND_SPEED_STATUS":        None,
+            "GROUND_SPEED_KT":            None,
+            "TRACK_ANGLE_RATE_STATUS":    None,
+            "TRACK_ANGLE_RATE_DEG_S":     None,
+            "TRUE_AIRSPEED_STATUS":       None,
+            "TRUE_AIRSPEED_KT":           None,
+            "MAGNETIC_HEADING_STATUS":      None,
+            "MAGNETIC_HEADING_DEG":         None,
+            "INDICATED_AIRSPEED_STATUS":    None,
+            "INDICATED_AIRSPEED_KT":        None,
+            "MACH_NUMBER_STATUS":           None,
+            "MACH_NUMBER":                  None,
+            "BARO_ALT_RATE_STATUS":         None,
+            "BARO_ALT_RATE_FPM":            None,
+            "INERTIAL_VERT_VELOCITY_STATUS": None,
+            "INERTIAL_VERT_VELOCITY_FPM":   None,
+            
         }
 
     @extract_octets
     def decode(self, octets: bytes) -> dict[str, any]:
         REP = octets[0]
         BLOCKS = []
-        
+
         pos = 1
         for _ in range(REP):
             BLOCK = octets[pos:pos + self.repetitive_block_size]
             BLOCKS.append(BLOCK)
             pos += self.repetitive_block_size
+
         return self._bits_to_data(self.data.copy(), BLOCKS)
 
-    def _bits_to_data(self, data, BLOCKS) -> dict[str, any]:
-        data["REP"] = len(BLOCKS)
-        data["BLOCKS"] = []
+    # ------------------------------------------------------------------
+    # Top-level dispatch
+    # ------------------------------------------------------------------
 
+    def _bits_to_data(self, data, BLOCKS) -> dict[str, any]:
         for BLOCK in BLOCKS:
-            MB_DATA = BLOCK[:7]
+            MB_DATA = BLOCK[:7]          # 56 bits of payload
             BDS_SELECTOR = BLOCK[7]
             BDS1 = (BDS_SELECTOR >> 4) & 0x0F
             BDS2 = BDS_SELECTOR & 0x0F
             BDS_CODE = f"{BDS1}.{BDS2}"
 
-            block_info = {
-                "BDS": BDS_CODE,
-                "MB_DATA_HEX": MB_DATA.hex().upper(),
-            }
+            if BDS_CODE not in self.SUPPORTED_BDS:
+                continue
 
-            if BDS_CODE in self.SUPPORTED_BDS:
-                block_info = {
-                "BDS": BDS_CODE,
-                "MB_DATA_HEX": MB_DATA.hex().upper(),
-                }
-                data["BLOCKS"].append(block_info)
+            if BDS_CODE == "4.0":
+                block_info = self._decode_bds40(MB_DATA)
+            elif BDS_CODE == "5.0":
+                block_info = self._decode_bds50(MB_DATA)
+            elif BDS_CODE == "6.0":
+                block_info = self._decode_bds60(MB_DATA)
+
+            data.update(block_info)
 
         return data
+
+    # ------------------------------------------------------------------
+    # Bit utilities  (1-based, MSB = bit 1, field width = 56 bits)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _bit(value: int, n: int) -> int:
+        """Return the value of bit n (1-based, MSB = bit 1) in a 56-bit integer."""
+        return (value >> (56 - n)) & 1
+
+    @staticmethod
+    def _bits_range(value: int, start: int, end: int) -> int:
+        """Return the unsigned integer formed by bits start..end (inclusive, 1-based)."""
+        width = end - start + 1
+        return (value >> (56 - end)) & ((1 << width) - 1)
+
+    # ------------------------------------------------------------------
+    # BDS 4.0 – Selected Vertical Intention
+    #
+    # Bit layout (56 bits):
+    #   1        : MCP/FCU altitude status
+    #   2 – 13   : MCP/FCU selected altitude   (×16 ft,      range 0–65 520 ft)
+    #   14       : FMS altitude status
+    #   15 – 26  : FMS selected altitude        (×16 ft,      range 0–65 520 ft)
+    #   27       : Barometric pressure status
+    #   28 – 39  : Barometric pressure setting  (×0.1 + 800 mb, range 0–410 mb)
+    #   40       : Reserved
+    #   41       : VNAV mode flag
+    #   42       : Alt-Hold mode flag
+    #   43       : Approach mode flag
+    #   44 – 47  : Reserved
+    #   48       : Target altitude source status
+    #   49 – 51  : Target altitude source value (3 bits)
+    #   52 – 56  : Reserved
+    # ------------------------------------------------------------------
+
+    def _decode_bds40(self, mb_data: bytes) -> dict:
+        BITS = int.from_bytes(mb_data, 'big')
+
+        # ── MCP/FCU Selected Altitude ──────────────────────────────────
+        MCP_STATUS   = self._bit(BITS, 1)
+        MCP_RAW      = self._bits_range(BITS, 2, 13)
+        MCP_ALTITUDE_FT = MCP_RAW * 16 if MCP_STATUS else None
+
+        # ── FMS Selected Altitude ──────────────────────────────────────
+        FMS_STATUS   = self._bit(BITS, 14)
+        FMS_RAW      = self._bits_range(BITS, 15, 26)
+        FMS_ALTITUDE_FT = FMS_RAW * 16 if FMS_STATUS else None
+
+        # ── Barometric Pressure Setting ────────────────────────────────
+        BARO_STATUS  = self._bit(BITS, 27)
+        BARO_RAW     = self._bits_range(BITS, 28, 39)
+        BARO_SETTING_MB = round(BARO_RAW * 0.1 + 800, 1) if BARO_STATUS else None
+
+        # ── Autopilot Mode Flags ───────────────────────────────────────
+        VNAV_MODE     = bool(self._bit(BITS, 41))
+        ALT_HOLD_MODE = bool(self._bit(BITS, 42))
+        APPROACH_MODE = bool(self._bit(BITS, 43))
+
+        # ── Target Altitude Source ─────────────────────────────────────
+        TARGET_ALT_SOURCE_STATUS = self._bit(BITS, 48)
+        TARGET_ALT_SOURCE_RAW    = self._bits_range(BITS, 49, 51)
+        TARGET_ALT_SOURCE        = TARGET_ALT_SOURCE_RAW if TARGET_ALT_SOURCE_STATUS else None
+
+        return {
+            "MCP_ALTITUDE_STATUS":        bool(MCP_STATUS),
+            "MCP_ALTITUDE_FT":            MCP_ALTITUDE_FT,
+            "FMS_ALTITUDE_STATUS":        bool(FMS_STATUS),
+            "FMS_ALTITUDE_FT":            FMS_ALTITUDE_FT,
+            "BARO_SETTING_STATUS":        bool(BARO_STATUS),
+            "BARO_SETTING_MB":            BARO_SETTING_MB,
+            "VNAV_MODE":                  VNAV_MODE,
+            "ALT_HOLD_MODE":              ALT_HOLD_MODE,
+            "APPROACH_MODE":              APPROACH_MODE,
+            "TARGET_ALT_SOURCE_STATUS":   bool(TARGET_ALT_SOURCE_STATUS),
+            "TARGET_ALT_SOURCE":          TARGET_ALT_SOURCE,
+        }
+
+    # ------------------------------------------------------------------
+    # BDS 5.0 – Track and Turn Report
+    #
+    # Bit layout (56 bits):
+    #   1        : Roll angle status
+    #   2        : Roll angle sign      (0 = right/positive, 1 = left/negative)
+    #   3 – 11   : Roll angle value     (×45/256 °,  range ±90°)
+    #   12       : True track angle status
+    #   13       : TTA sign             (0 = 0–180°,  1 = 180–360°)
+    #   14 – 23  : TTA value            (×90/512 °)
+    #   24       : Ground speed status
+    #   25 – 34  : Ground speed value   (×2 kt,       range 0–2046 kt)
+    #   35       : Track angle rate status
+    #   36       : TAR sign             (0 = right/positive, 1 = left/negative)
+    #   37 – 45  : TAR value            (×8/256 °/s,  range ±16 °/s)
+    #   46       : True airspeed status
+    #   47 – 56  : TAS value            (×2 kt,       range 0–2046 kt)
+    # ------------------------------------------------------------------
+
+    def _decode_bds50(self, mb_data: bytes) -> dict:
+        BITS = int.from_bytes(mb_data, 'big')
+
+        # ── Roll Angle ─────────────────────────────────────────────────
+        ROLL_STATUS   = self._bit(BITS, 1)
+        ROLL_SIGN     = self._bit(BITS, 2)
+        ROLL_RAW      = self._bits_range(BITS, 3, 11)
+        if ROLL_STATUS:
+            ROLL_ANGLE_DEG = round(ROLL_RAW * (45 / 256), 2)
+            if ROLL_SIGN:
+                ROLL_ANGLE_DEG = -ROLL_ANGLE_DEG
+        else:
+            ROLL_ANGLE_DEG = None
+
+        # ── True Track Angle ───────────────────────────────────────────
+        TTA_STATUS = self._bit(BITS, 12)
+        TTA_SIGN   = self._bit(BITS, 13)
+        TTA_RAW    = self._bits_range(BITS, 14, 23)
+        if TTA_STATUS:
+            TTA_BASE = round(TTA_RAW * (90 / 512), 2)
+            TRUE_TRACK_ANGLE_DEG = round(180.0 + TTA_BASE if TTA_SIGN else TTA_BASE, 2)
+        else:
+            TRUE_TRACK_ANGLE_DEG = None
+
+        # ── Ground Speed ───────────────────────────────────────────────
+        GS_STATUS     = self._bit(BITS, 24)
+        GS_RAW        = self._bits_range(BITS, 25, 34)
+        GROUND_SPEED_KT = GS_RAW * 2 if GS_STATUS else None
+
+        # ── Track Angle Rate ───────────────────────────────────────────
+        TAR_STATUS = self._bit(BITS, 35)
+        TAR_SIGN   = self._bit(BITS, 36)
+        TAR_RAW    = self._bits_range(BITS, 37, 45)
+        if TAR_STATUS:
+            TRACK_ANGLE_RATE_DEG_S = round(TAR_RAW * (8 / 256), 4)
+            if TAR_SIGN:
+                TRACK_ANGLE_RATE_DEG_S = -TRACK_ANGLE_RATE_DEG_S
+        else:
+            TRACK_ANGLE_RATE_DEG_S = None
+
+        # ── True Airspeed ──────────────────────────────────────────────
+        TAS_STATUS    = self._bit(BITS, 46)
+        TAS_RAW       = self._bits_range(BITS, 47, 56)
+        TRUE_AIRSPEED_KT = TAS_RAW * 2 if TAS_STATUS else None
+
+        return {
+            "ROLL_ANGLE_STATUS":          bool(ROLL_STATUS),
+            "ROLL_ANGLE_DEG":             ROLL_ANGLE_DEG,
+            "TRUE_TRACK_ANGLE_STATUS":    bool(TTA_STATUS),
+            "TRUE_TRACK_ANGLE_DEG":       TRUE_TRACK_ANGLE_DEG,
+            "GROUND_SPEED_STATUS":        bool(GS_STATUS),
+            "GROUND_SPEED_KT":            GROUND_SPEED_KT,
+            "TRACK_ANGLE_RATE_STATUS":    bool(TAR_STATUS),
+            "TRACK_ANGLE_RATE_DEG_S":     TRACK_ANGLE_RATE_DEG_S,
+            "TRUE_AIRSPEED_STATUS":       bool(TAS_STATUS),
+            "TRUE_AIRSPEED_KT":           TRUE_AIRSPEED_KT,
+        }
+
+    # ------------------------------------------------------------------
+    # BDS 6.0 – Heading and Speed Report
+    #
+    # Bit layout (56 bits):
+    #   1        : Magnetic heading status
+    #   2        : MH sign              (0 = 0–180°,   1 → 360 − value)
+    #   3 – 12   : MH value             (×90/512 °)
+    #   13       : IAS status
+    #   14 – 23  : IAS value            (×1 kt,        range 0–1023 kt)
+    #   24       : Mach status
+    #   25 – 34  : Mach value           (×0.004,       range 0–4.092)
+    #   35       : Barometric alt rate status
+    #   36       : Baro alt rate sign   (0 = climb/positive, 1 = descend/negative)
+    #   37 – 45  : Baro alt rate value  (×32 ft/min,   range ±16 352 ft/min)
+    #   46       : Inertial vert velocity status
+    #   47       : IVV sign             (0 = climb/positive, 1 = descend/negative)
+    #   48 – 56  : IVV value            (×32 ft/min,   range ±16 352 ft/min)
+    # ------------------------------------------------------------------
+
+    def _decode_bds60(self, mb_data: bytes) -> dict:
+        BITS = int.from_bytes(mb_data, 'big')
+
+        # ── Magnetic Heading ───────────────────────────────────────────
+        MH_STATUS = self._bit(BITS, 1)
+        MH_SIGN   = self._bit(BITS, 2)
+        MH_RAW    = self._bits_range(BITS, 3, 12)
+        if MH_STATUS:
+            MH_BASE = round(MH_RAW * (90 / 512), 2)
+            MAGNETIC_HEADING_DEG = round(360.0 - MH_BASE if MH_SIGN else MH_BASE, 2)
+        else:
+            MAGNETIC_HEADING_DEG = None
+
+        # ── Indicated Airspeed ─────────────────────────────────────────
+        IAS_STATUS  = self._bit(BITS, 13)
+        IAS_RAW     = self._bits_range(BITS, 14, 23)
+        INDICATED_AIRSPEED_KT = IAS_RAW if IAS_STATUS else None
+
+        # ── Mach Number ────────────────────────────────────────────────
+        MACH_STATUS = self._bit(BITS, 24)
+        MACH_RAW    = self._bits_range(BITS, 25, 34)
+        MACH_NUMBER = round(MACH_RAW * 0.004, 4) if MACH_STATUS else None
+
+        # ── Barometric Altitude Rate ───────────────────────────────────
+        BAR_STATUS = self._bit(BITS, 35)
+        BAR_SIGN   = self._bit(BITS, 36)
+        BAR_RAW    = self._bits_range(BITS, 37, 45)
+        if BAR_STATUS:
+            BARO_ALT_RATE_FPM = BAR_RAW * 32
+            if BAR_SIGN:
+                BARO_ALT_RATE_FPM = -BARO_ALT_RATE_FPM
+        else:
+            BARO_ALT_RATE_FPM = None
+
+        # ── Inertial Vertical Velocity ─────────────────────────────────
+        IVV_STATUS = self._bit(BITS, 46)
+        IVV_SIGN   = self._bit(BITS, 47)
+        IVV_RAW    = self._bits_range(BITS, 48, 56)
+        if IVV_STATUS:
+            INERTIAL_VERT_VELOCITY_FPM = IVV_RAW * 32
+            if IVV_SIGN:
+                INERTIAL_VERT_VELOCITY_FPM = -INERTIAL_VERT_VELOCITY_FPM
+        else:
+            INERTIAL_VERT_VELOCITY_FPM = None
+
+        return {
+            "MAGNETIC_HEADING_STATUS":      bool(MH_STATUS),
+            "MAGNETIC_HEADING_DEG":         MAGNETIC_HEADING_DEG,
+            "INDICATED_AIRSPEED_STATUS":    bool(IAS_STATUS),
+            "INDICATED_AIRSPEED_KT":        INDICATED_AIRSPEED_KT,
+            "MACH_NUMBER_STATUS":           bool(MACH_STATUS),
+            "MACH_NUMBER":                  MACH_NUMBER,
+            "BARO_ALT_RATE_STATUS":         bool(BAR_STATUS),
+            "BARO_ALT_RATE_FPM":            BARO_ALT_RATE_FPM,
+            "INERTIAL_VERT_VELOCITY_STATUS": bool(IVV_STATUS),
+            "INERTIAL_VERT_VELOCITY_FPM":   INERTIAL_VERT_VELOCITY_FPM,
+        }
