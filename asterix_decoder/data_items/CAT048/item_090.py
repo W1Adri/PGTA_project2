@@ -16,9 +16,11 @@ class Item090(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "V": None,
-            "G": None,
-            "FL": None,
+            "V_090": None, #
+            "G_090": None, #
+            "FL": None, #
+            "H(m)": None, #
+            "H(ft)": None, #
         }
 
     @extract_octets
@@ -32,18 +34,20 @@ class Item090(DataItem):
         return self._bits_to_data(self.data.copy(), V, G, FL)
 
     def _bits_to_data(self, data, V, G, FL) -> dict[str, any]:
-        data["V"] = {
+        data["V_090"] = {
             0: "Code validated",
             1: "Code not validated",
         }.get(V, "Unknown")
 
-        data["G"] = {
+        data["G_090"] = {
             0: "Default",
             1: "Garbled code",
         }.get(G, "Unknown")
 
         fl_signed = self._twos_complement(FL, 14)
         data["FL"] = fl_signed / 4.0
+        data["H(ft)"] = int(data["FL"] * 100)  # Convert flight level to feet
+        data["H(m)"] = float(f"{(data['H(ft)'] * 0.3048):.1f}")  # Convert feet to meters
         return data
     
     def _twos_complement(self, value: int, bits: int) -> int:

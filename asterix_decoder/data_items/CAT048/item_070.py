@@ -17,10 +17,10 @@ class Item070(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "V": None,
-            "G": None,
+            "V_070": None, #
+            "G_070": None, #
             "L": None,
-            "MODE_3A_CODE": None,
+            "MODE_3/A": None, #
         }
 
     @extract_octets
@@ -34,7 +34,7 @@ class Item070(DataItem):
         return self._bits_to_data(self.data.copy(), V, G, L, CODE_BITS)
 
     def _bits_to_data(self, data, V, G, L, CODE_BITS) -> dict[str, any]:
-        data["V"] = {
+        data["V_070"] = {
             0: "Code validated",
             1: "Code not validated",
         }.get(V, "Unknown")
@@ -53,5 +53,5 @@ class Item070(DataItem):
         b = (CODE_BITS >> 6) & 0x7
         c = (CODE_BITS >> 3) & 0x7
         d = CODE_BITS & 0x7
-        data["MODE_3A_CODE"] = f"{a}{b}{c}{d}"
+        data["MODE_3/A"] = f"{a}{b}{c}{d}"
         return data

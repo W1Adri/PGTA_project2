@@ -17,17 +17,17 @@ class Item020(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "TYP": None,    
-            "SIM": None,  
-            "RDP": None, 
-            "SPI": None,   
-            "RAB": None,   
-            "TST": None,   
-            "ERR": None,   
-            "XPP": None, 
-            "ME": None,     
-            "MI": None,
-            "FOE_FRI": None,
+            "TYP_020": None, #
+            "SIM_020": None, #
+            "RDP_020": None, #
+            "SPI_020": None, #  
+            "RAB_020": None, #  
+            "TST_020": None, #  
+            "ERR_020": None, #   
+            "XPP_020": None, #
+            "ME_020": None, #   
+            "MI_020": None, #
+            "FOE_FRI_020": None, #
             "ADSB_EP": None,  #On-Site ADS-B Information
             "ADSB_VAL": None,
             "SCN_EP": None,   #Surveillance Cluster Network Information
@@ -92,7 +92,7 @@ class Item020(DataItem):
     def _bits_to_data(self, data, OCTETS_LEN, TYP, SIM, RDP, SPI, RAB, TST, ERR, XPP, ME, MI, FOE_FRI, ADSB_EP, ADSB_VAL, SCN_EP, SCN_VAL, PA_EP, PA_VAL) -> dict[str, any]:
         
         ### FIRST OCTET ###
-        data["TYP"] = {
+        data["TYP_020"] = {
             0b000: "No detection",
             0b001: "Single PSR detection",
             0b010: "Single SSR detection",
@@ -103,22 +103,22 @@ class Item020(DataItem):
             0b111: "ModeS Roll-Call + PSR",
         }.get(TYP, "Unknown")
         
-        data["SIM"] = {
+        data["SIM_020"] = {
             0b0: "Actual target report",
             0b1: "Simulated target report",
         }.get(SIM, "Unknown")
         
-        data["RDP"] = {
+        data["RDP_020"] = {
             0b0: "Report from RDP Chain 1",
             0b1: "Report from RDP Chain 2",
         }.get(RDP, "Unknown")
         
-        data["SPI"] = {
+        data["SPI_020"] = {
             0b0: "Absence of SPI",
             0b1: "Special Position Identification",
         }.get(SPI, "Unknown")
         
-        data["RAB"] = {
+        data["RAB_020"] = {
             0b0: "Report from aircraft transponder",
             0b1: "Report from field monitor (fixed transponder)",
         }.get(RAB, "Unknown")
@@ -127,32 +127,32 @@ class Item020(DataItem):
         if OCTETS_LEN == 1:
             return data
 
-        data["TST"] = {
+        data["TST_020"] = {
             0b0: "Real target report",
             0b1: "Test target report",
         }.get(TST, "Unknown")
 
-        data["ERR"] = {
+        data["ERR_020"] = {
             0b0: "No Extended Range",
             0b1: "Extended Range present",
         }.get(ERR, "Unknown")
 
-        data["XPP"] = {
+        data["XPP_020"] = {
             0b0: "No X-Pulse present",
             0b1: "X-Pulse present",
         }.get(XPP, "Unknown")
 
-        data["ME"] = {
+        data["ME_020"] = {
             0b0: "No military emergency",
             0b1: "Military emergency",
         }.get(ME, "Unknown")
 
-        data["MI"] = {
+        data["MI_020"] = {
             0b0: "No military identification",
             0b1: "Military identification",
         }.get(MI, "Unknown")
         
-        data["FOE_FRI"] = {
+        data["FOE_FRI_020"] = {
             0b00: "No Mode 4 interrogation",
             0b01: "Freindly target",
             0b10: "Unknown target",

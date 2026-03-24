@@ -17,8 +17,8 @@ class Item010(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "SAC": None,
-            "SIC": None,
+            "SAC": None, #
+            "SIC": None, #
         }
 
     @extract_octets

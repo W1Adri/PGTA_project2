@@ -16,8 +16,7 @@ class Item140(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "TIME_SECONDS": None,
-            "TIME_UTC": None,
+            "Time": None, #
         }
 
     @extract_octets
@@ -26,12 +25,12 @@ class Item140(DataItem):
         return self._bits_to_data(self.data.copy(), TIME)
 
     def _bits_to_data(self, data, TIME) -> dict[str, any]:
-        data["TIME_SECONDS"] = TIME / 128.0
-        data["TIME_UTC"] = self._format_utc_from_seconds(TIME / 128.0)
+        data["Time"] = self._format_utc_from_seconds(TIME / 128.0)
         return data
 
     def _format_utc_from_seconds(self, total_seconds: float) -> str:
         hours = int(total_seconds // 3600) % 24
         minutes = int((total_seconds % 3600) // 60)
         seconds = total_seconds % 60
-        return f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
+        miliseconds = total_seconds % 1
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}:{int(miliseconds * 1000):03d}"

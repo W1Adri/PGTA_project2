@@ -24,13 +24,13 @@ class Item130(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "SRL_DEG": None,
-            "SRR": None,
-            "SAM_DBM": None,
-            "PRL_DEG": None,
-            "PAM_DBM": None,
-            "RPD_NM": None,
-            "APD_DEG": None,
+            "SRL_130": None, #
+            "SRR_130": None, #
+            "SAM_130": None, #
+            "PRL_130": None, #
+            "PAM_130": None, #
+            "RPD_130": None, #
+            "APD_130": None, #
         }
 
     def extract_compound(self, unextracted_octets: bytes) -> tuple[bytes, int]:
@@ -102,25 +102,25 @@ class Item130(DataItem):
 
     def _bits_to_data(self, data, SRL, SRR, SAM, PRL, PAM, RPD, APD) -> dict[str, any]:
         if SRL is not None:
-            data["SRL_DEG"] = SRL * 360.0 / 8192.0
+            data["SRL_130"] = f"{(SRL * 360.0 / 8192.0):.3f} dg"
 
         if SRR is not None:
-            data["SRR"] = SRR
+            data["SRR_130"] = SRR
 
         if SAM is not None:
-            data["SAM_DBM"] = self._twos_complement(SAM, 8)
+            data["SAM_130"] = f"{self._twos_complement(SAM, 8):.3f} dBm"
 
         if PRL is not None:
-            data["PRL_DEG"] = PRL * 360.0 / 8192.0
+            data["PRL_130"] = f"{(PRL * 360.0 / 8192.0):.3f} dg"
 
         if PAM is not None:
-            data["PAM_DBM"] = self._twos_complement(PAM, 8)
+            data["PAM_130"] = f"{self._twos_complement(PAM, 8):.3f} dBm"
 
         if RPD is not None:
-            data["RPD_NM"] = self._twos_complement(RPD, 8) / 256.0
+            data["RPD_130"] = f"{(self._twos_complement(RPD, 8) / 256.0):.3f} NM"
 
         if APD is not None:
-            data["APD_DEG"] = self._twos_complement(APD, 8) * 360.0 / 16384.0
+            data["APD_130"] = f"{(self._twos_complement(APD, 8) * 360.0 / 16384.0):.3f} dg"
         return data
 
 

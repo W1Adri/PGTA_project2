@@ -26,37 +26,37 @@ class Item250(DataItem):
     def __init__(self, item_name: str, length_type):
         super().__init__(item_name, length_type)
         self.data = {
-            "MCP_ALTITUDE_STATUS":        None,
-            "MCP_ALTITUDE_FT":            None,
-            "FMS_ALTITUDE_STATUS":        None,
-            "FMS_ALTITUDE_FT":            None,
-            "BARO_SETTING_STATUS":        None,
-            "BARO_SETTING_MB":            None,
-            "VNAV_MODE":                  None,
-            "ALT_HOLD_MODE":              None,
-            "APPROACH_MODE":              None,
+            "MCP_ALT_STATUS":             None,
+            "MCP_ALT":                    None, #
+            "FMS_ALT_STATUS":             None,
+            "FMS_ALT":                    None, # 
+            "BR_STATUS":                  None,
+            "BP":                         None, # Baro Pressure
+            "VNAV":                       None, # 
+            "ALT_HOLD":                   None, #
+            "APP":                        None, # Aproach mode
             "TARGET_ALT_SOURCE_STATUS":   None,
             "TARGET_ALT_SOURCE":          None,
-            "ROLL_ANGLE_STATUS":          None,
-            "ROLL_ANGLE_DEG":             None,
-            "TRUE_TRACK_ANGLE_STATUS":    None,
-            "TRUE_TRACK_ANGLE_DEG":       None,
-            "GROUND_SPEED_STATUS":        None,
-            "GROUND_SPEED_KT":            None,
-            "TRACK_ANGLE_RATE_STATUS":    None,
-            "TRACK_ANGLE_RATE_DEG_S":     None,
-            "TRUE_AIRSPEED_STATUS":       None,
-            "TRUE_AIRSPEED_KT":           None,
-            "MAGNETIC_HEADING_STATUS":      None,
-            "MAGNETIC_HEADING_DEG":         None,
-            "INDICATED_AIRSPEED_STATUS":    None,
-            "INDICATED_AIRSPEED_KT":        None,
-            "MACH_NUMBER_STATUS":           None,
-            "MACH_NUMBER":                  None,
-            "BARO_ALT_RATE_STATUS":         None,
-            "BARO_ALT_RATE_FPM":            None,
-            "INERTIAL_VERT_VELOCITY_STATUS": None,
-            "INERTIAL_VERT_VELOCITY_FPM":   None,
+            "RA_STATUS":                  None,
+            "RA":                         None, # Roll Angle
+            "TTA_STATUS":                 None,
+            "TTA":                        None, # True Track Angle degree
+            "GS_STATUS":                  None,
+            "GS":                         None, # Ground Speed kt
+            "TAR_STATUS":                 None,
+            "TAR":                        None, # Track Angle Rate degree/s
+            "TAS_STATUS":                 None,
+            "TAS":                         None, # True Airspeed kt
+            "HDG_STATUS":                   None,
+            "HDG":                          None, # Magnetic Heading degree [-180 - 180]
+            "IAS_STATUS":                   None,
+            "IAS":                          None, # Indicated Airspeed kt
+            "MACH_STATUS":                  None,
+            "MACH":                         None, #
+            "BAR_STATUS":                   None,
+            "BAR":                          None, # Barometric Altitude Rate ft/min
+            "IVV_STATUS":                   None,
+            "IVV":                          None, # Inertial Vertical Velocity ft/min
             
         }
 
@@ -163,15 +163,15 @@ class Item250(DataItem):
         TARGET_ALT_SOURCE        = TARGET_ALT_SOURCE_RAW if TARGET_ALT_SOURCE_STATUS else None
 
         return {
-            "MCP_ALTITUDE_STATUS":        bool(MCP_STATUS),
-            "MCP_ALTITUDE_FT":            MCP_ALTITUDE_FT,
-            "FMS_ALTITUDE_STATUS":        bool(FMS_STATUS),
-            "FMS_ALTITUDE_FT":            FMS_ALTITUDE_FT,
-            "BARO_SETTING_STATUS":        bool(BARO_STATUS),
-            "BARO_SETTING_MB":            BARO_SETTING_MB,
-            "VNAV_MODE":                  VNAV_MODE,
-            "ALT_HOLD_MODE":              ALT_HOLD_MODE,
-            "APPROACH_MODE":              APPROACH_MODE,
+            "MCP_STATUS":                 bool(MCP_STATUS),
+            "MCP":                        MCP_ALTITUDE_FT,
+            "FMS_ALT_STATUS":             bool(FMS_STATUS),
+            "FMS_ALT":                    FMS_ALTITUDE_FT,
+            "BP_STATUS":                  bool(BARO_STATUS),
+            "BP":                         BARO_SETTING_MB,
+            "VNAV":                       VNAV_MODE,
+            "ALT_HOLD":                   ALT_HOLD_MODE,
+            "APP":                        APPROACH_MODE,
             "TARGET_ALT_SOURCE_STATUS":   bool(TARGET_ALT_SOURCE_STATUS),
             "TARGET_ALT_SOURCE":          TARGET_ALT_SOURCE,
         }
@@ -241,16 +241,16 @@ class Item250(DataItem):
         TRUE_AIRSPEED_KT = TAS_RAW * 2 if TAS_STATUS else None
 
         return {
-            "ROLL_ANGLE_STATUS":          bool(ROLL_STATUS),
-            "ROLL_ANGLE_DEG":             ROLL_ANGLE_DEG,
-            "TRUE_TRACK_ANGLE_STATUS":    bool(TTA_STATUS),
-            "TRUE_TRACK_ANGLE_DEG":       TRUE_TRACK_ANGLE_DEG,
-            "GROUND_SPEED_STATUS":        bool(GS_STATUS),
-            "GROUND_SPEED_KT":            GROUND_SPEED_KT,
-            "TRACK_ANGLE_RATE_STATUS":    bool(TAR_STATUS),
-            "TRACK_ANGLE_RATE_DEG_S":     TRACK_ANGLE_RATE_DEG_S,
-            "TRUE_AIRSPEED_STATUS":       bool(TAS_STATUS),
-            "TRUE_AIRSPEED_KT":           TRUE_AIRSPEED_KT,
+            "RA_STATUS":                  bool(ROLL_STATUS),
+            "RA":                         ROLL_ANGLE_DEG,
+            "TTA_STATUS":                 bool(TTA_STATUS),
+            "TTA":                        TRUE_TRACK_ANGLE_DEG,
+            "GS_STATUS":                  bool(GS_STATUS),
+            "GS":                         GROUND_SPEED_KT,
+            "TAR_STATUS":                 bool(TAR_STATUS),
+            "TAR":                        TRACK_ANGLE_RATE_DEG_S,
+            "TAS_STATUS":                 bool(TAS_STATUS),
+            "TAS":                        TRUE_AIRSPEED_KT,
         }
 
     # ------------------------------------------------------------------
@@ -280,8 +280,8 @@ class Item250(DataItem):
         MH_SIGN   = self._bit(BITS, 2)
         MH_RAW    = self._bits_range(BITS, 3, 12)
         if MH_STATUS:
-            MH_BASE = round(MH_RAW * (90 / 512), 2)
-            MAGNETIC_HEADING_DEG = round(360.0 - MH_BASE if MH_SIGN else MH_BASE, 2)
+            MH_BASE = round(MH_RAW * (90 / 512), 6)
+            MAGNETIC_HEADING_DEG = -1 * MH_BASE if MH_SIGN else MH_BASE, 6
         else:
             MAGNETIC_HEADING_DEG = None
 
@@ -293,7 +293,7 @@ class Item250(DataItem):
         # ── Mach Number ────────────────────────────────────────────────
         MACH_STATUS = self._bit(BITS, 24)
         MACH_RAW    = self._bits_range(BITS, 25, 34)
-        MACH_NUMBER = round(MACH_RAW * 0.004, 4) if MACH_STATUS else None
+        MACH_NUMBER = round(MACH_RAW * 0.004, 3) if MACH_STATUS else None
 
         # ── Barometric Altitude Rate ───────────────────────────────────
         BAR_STATUS = self._bit(BITS, 35)
@@ -318,14 +318,14 @@ class Item250(DataItem):
             INERTIAL_VERT_VELOCITY_FPM = None
 
         return {
-            "MAGNETIC_HEADING_STATUS":      bool(MH_STATUS),
-            "MAGNETIC_HEADING_DEG":         MAGNETIC_HEADING_DEG,
-            "INDICATED_AIRSPEED_STATUS":    bool(IAS_STATUS),
-            "INDICATED_AIRSPEED_KT":        INDICATED_AIRSPEED_KT,
-            "MACH_NUMBER_STATUS":           bool(MACH_STATUS),
-            "MACH_NUMBER":                  MACH_NUMBER,
-            "BARO_ALT_RATE_STATUS":         bool(BAR_STATUS),
-            "BARO_ALT_RATE_FPM":            BARO_ALT_RATE_FPM,
-            "INERTIAL_VERT_VELOCITY_STATUS": bool(IVV_STATUS),
-            "INERTIAL_VERT_VELOCITY_FPM":   INERTIAL_VERT_VELOCITY_FPM,
+            "HDG_STATUS":                   bool(MH_STATUS),
+            "HDG":                          MAGNETIC_HEADING_DEG,
+            "IAS_STATUS":                   bool(IAS_STATUS),
+            "IAS":                          INDICATED_AIRSPEED_KT,
+            "MACH_STATUS":                  bool(MACH_STATUS),
+            "MACH":                         MACH_NUMBER,
+            "BAR_STATUS":                   bool(BAR_STATUS),
+            "BAR":                          BARO_ALT_RATE_FPM,
+            "IVV_STATUS":                   bool(IVV_STATUS),
+            "IVV":                          INERTIAL_VERT_VELOCITY_FPM,
         }
