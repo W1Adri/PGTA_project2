@@ -53,25 +53,25 @@ class Item170(DataItem):
     def _bits_to_data(self, data, OCTETS_LEN, CNF, RAD, DOU, MAH, CDM, TRE, GHO, SUP, TCC) -> dict[str, any]:
         ### FIRST OCTET ###
         data["CNF_170"] = {
-            0: "Confirmed Track",
-            1: "Tentative Track",
+            0: "Confirmed track",
+            1: "Tentative track",
         }.get(CNF, None)
 
         data["RAD_170"] = {
-            0b00: "Combined Track",
-            0b01: "PSR Track",
-            0b10: "SSR/Mode S Track",
+            0b00: "Combined",
+            0b01: "PSR",
+            0b10: "SSR/MODE S",
             0b11: "Invalid",
         }.get(RAD, None)
 
         data["DOU_170"] = {
             0: "Normal confidence",
-            1: "Low confidence in plot to track association",
+            1: "Low confidence",
         }.get(DOU, None)
 
         data["MAH_170"] = {
-            0: "No horizontal man. sensed",
-            1: "Horizontal man. sensed",
+            0: "No horizontal man.sensed",
+            1: "Horizontal man.sensed",
         }.get(MAH, None)
 
         data["CDM_170"] = {
@@ -87,22 +87,22 @@ class Item170(DataItem):
         
         data["TRE_170"] = {
             0: "Track still alive",
-            1: "End of track lifetime (last report for this track)",
+            1: "Last report",
         }.get(TRE, None)
 
         data["GHO_170"] = {
-            0: "True target track",
-            1: "Ghost target track",
+            0: "True target",
+            1: "Ghost target",
         }.get(GHO, None)
 
         data["SUP_170"] = {
-            0: "No",
-            1: "Yes",
+            0: "NO",
+            1: "YES",
         }.get(SUP, None)
 
         data["TCC_170"] = {
-            0: "Tracking performed in Radar Plane",
-            1: "Slant range correction and projection into a 2D reference plane applied",
+            0: "Tracking performed", #in Radar Plane
+            1: "Slat range correction",
         }.get(TCC, None)
         return data
 

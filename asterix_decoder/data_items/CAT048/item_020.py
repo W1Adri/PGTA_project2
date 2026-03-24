@@ -109,8 +109,8 @@ class Item020(DataItem):
         }.get(SIM, None)
         
         data["RDP_020"] = {
-            0b0: "Report from RDP Chain 1",
-            0b1: "Report from RDP Chain 2",
+            0b0: "RDP chain 1",
+            0b1: "RDP chain 2",
         }.get(RDP, None)
         
         data["SPI_020"] = {
@@ -119,8 +119,8 @@ class Item020(DataItem):
         }.get(SPI, None)
         
         data["RAB_020"] = {
-            0b0: "Report from aircraft transponder",
-            0b1: "Report from field monitor (fixed transponder)",
+            0b0: "Report from Aircraft",
+            0b1: "Report from Field Monitor", #Report from field monitor (fixed transponder)
         }.get(RAB, None)
         
         ### SECOND OCTET ###
@@ -128,18 +128,18 @@ class Item020(DataItem):
             return data
 
         data["TST_020"] = {
-            0b0: "Real target report",
-            0b1: "Test target report",
+            0b0: "Real target",
+            0b1: "Test target",
         }.get(TST, None)
 
         data["ERR_020"] = {
-            0b0: "No Extended Range",
-            0b1: "Extended Range present",
+            0b0: "No extended range",
+            0b1: "Extended range",
         }.get(ERR, None)
 
         data["XPP_020"] = {
-            0b0: "No X-Pulse present",
-            0b1: "X-Pulse present",
+            0b0: "No X-Pulse",
+            0b1: "X-Pulse",
         }.get(XPP, None)
 
         data["ME_020"] = {
@@ -148,8 +148,8 @@ class Item020(DataItem):
         }.get(ME, None)
 
         data["MI_020"] = {
-            0b0: "No military identification",
-            0b1: "Military identification",
+            0b0: "No military ident.",
+            0b1: "Military ident.",
         }.get(MI, None)
         
         data["FOE_FRI_020"] = {

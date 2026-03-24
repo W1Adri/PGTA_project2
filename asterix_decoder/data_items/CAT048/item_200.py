@@ -28,8 +28,6 @@ class Item200(DataItem):
         return self._bits_to_data(self.data.copy(), GROUNDSPEED, HEADING)
 
     def _bits_to_data(self, data, GROUNDSPEED, HEADING) -> dict[str, any]:
-        GROUNDSPEED_KT = GROUNDSPEED / float(1 << 14)
-
-        data["GS_KT"] = round(GROUNDSPEED_KT * 0.22, 1)
+        data["GS_KT"] = round(GROUNDSPEED * 0.22, 2)
         data["HEADING"] = round(HEADING * 360.0 / 65536.0, 4)
         return data

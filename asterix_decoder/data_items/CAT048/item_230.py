@@ -21,7 +21,7 @@ class Item230(DataItem):
             "COM_230": None,
             "STAT_230": None,
             "SI_230": None,
-            "MSSC_230": None,
+            "MSCC_230": None,
             "ARC_230": None,
             "AIC_230": None,
             "B1A_230": None,
@@ -35,20 +35,20 @@ class Item230(DataItem):
         COM = (value >> 13) & 0x7
         STAT = (value >> 10) & 0x7
         SI = (value >> 9) & 0x1
-        MSSC = (value >> 7) & 0x1
+        MSCC = (value >> 7) & 0x1
         ARC = (value >> 6) & 0x1
         AIC = (value >> 5) & 0x1
         B1A = (value >> 4) & 0x1
         B1B = value & 0x0F
 
-        return self._bits_to_data(self.data.copy(), COM, STAT, SI, MSSC, ARC, AIC, B1A, B1B)
+        return self._bits_to_data(self.data.copy(), COM, STAT, SI, MSCC, ARC, AIC, B1A, B1B)
 
-    def _bits_to_data(self, data, COM, STAT, SI, MSSC, ARC, AIC, B1A, B1B) -> dict[str, any]:
+    def _bits_to_data(self, data, COM, STAT, SI, MSCC, ARC, AIC, B1A, B1B) -> dict[str, any]:
         data["COM_230"] = {
-            0: "No communications capability (surveillance only)",
-            1: "Comm. A and Comm. B capability",
-            2: "Comm. A, Comm. B and Uplink ELM",
-            3: "Comm. A, Comm. B, Uplink ELM and Downlink ELM",
+            0: "No communications capability",
+            1: "COMM.A and COMM.B capability",
+            2: "COMM.A, COMM.B and Uplink ELM",
+            3: "COMM.A, COMM.B, Uplink ELM and Downlink ELM",
             4: "Level 5 Transponder capability",
             5: "Not assigned",
             6: "Not assigned",
@@ -71,10 +71,10 @@ class Item230(DataItem):
             1: "II-Code Capable",
         }.get(SI, None)
 
-        data["MSSC_230"] = {
-            0: "No",
-            1: "Yes",
-        }.get(MSSC, None)
+        data["MSCC_230"] = {
+            0: "NO",
+            1: "YES",
+        }.get(MSCC, None)
 
         data["ARC_230"] = {
             0: "100 ft resolution",
@@ -82,10 +82,10 @@ class Item230(DataItem):
         }.get(ARC, None)
 
         data["AIC_230"] = {
-            0: "No",
-            1: "Yes",
+            0: "NO",
+            1: "YES",
         }.get(AIC, None)
 
-        data["B1A_230"] = B1A
-        data["B1B_230"] = B1B
+        data["B1A_230"] = f"BDS 1,0 bit16={bin(B1A)}"
+        data["B1B_230"] = f"BDS 1,0 bit37/40={bin(B1B)}"
         return data

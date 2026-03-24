@@ -25,7 +25,7 @@ class Item130(DataItem):
         super().__init__(item_name, length_str)
         self.data = {
             "SRL_130": None, #
-            "SRR_130": None, #
+            "SSR_130": None, #
             "SAM_130": None, #
             "PRL_130": None, #
             "PAM_130": None, #
@@ -60,7 +60,7 @@ class Item130(DataItem):
         PRIMARY = octets[0]
 
         SRL_PRESENT = (PRIMARY >> 7) & 0x1
-        SRR_PRESENT = (PRIMARY >> 6) & 0x1
+        SSR_PRESENT = (PRIMARY >> 6) & 0x1
         SAM_PRESENT = (PRIMARY >> 5) & 0x1
         PRL_PRESENT = (PRIMARY >> 4) & 0x1
         PAM_PRESENT = (PRIMARY >> 3) & 0x1
@@ -79,7 +79,7 @@ class Item130(DataItem):
         if SRL_PRESENT:
             SRL = octets[pos]
             pos += 1
-        if SRR_PRESENT:
+        if SSR_PRESENT:
             SRR = octets[pos]
             pos += 1
         if SAM_PRESENT:
@@ -102,25 +102,25 @@ class Item130(DataItem):
 
     def _bits_to_data(self, data, SRL, SRR, SAM, PRL, PAM, RPD, APD) -> dict[str, any]:
         if SRL is not None:
-            data["SRL_130"] = f"{(SRL * 360.0 / 8192.0):.3f} dg"
+            data["SRL_130"] = f"{round(SRL * 360.0 / 8192.0, 3):.3f} dg".replace(".", ",")
 
         if SRR is not None:
-            data["SRR_130"] = SRR
+            data["SSR_130"] = SRR
 
         if SAM is not None:
-            data["SAM_130"] = f"{self._twos_complement(SAM, 8):.3f} dBm"
+            data["SAM_130"] = f"{round(self._twos_complement(SAM, 8))} dBm"
 
         if PRL is not None:
-            data["PRL_130"] = f"{(PRL * 360.0 / 8192.0):.3f} dg"
+            data["PRL_130"] = f"{round(PRL * 360.0 / 8192.0, 3):.3f} dg".replace(".", ",")
 
         if PAM is not None:
-            data["PAM_130"] = f"{self._twos_complement(PAM, 8):.3f} dBm"
+            data["PAM_130"] = f"{round(self._twos_complement(PAM, 8), 3):.3f} dBm".replace(".", ",")
 
         if RPD is not None:
-            data["RPD_130"] = f"{(self._twos_complement(RPD, 8) / 256.0):.3f} NM"
+            data["RPD_130"] = f"{round((self._twos_complement(RPD, 8) / 256.0), 3):.3f} NM".replace(".", ",")
 
         if APD is not None:
-            data["APD_130"] = f"{(self._twos_complement(APD, 8) * 360.0 / 16384.0):.3f} dg"
+            data["APD_130"] = f"{round((self._twos_complement(APD, 8) * 360.0 / 16384.0), 3):.3f} dg".replace(".", ",")  
         return data
 
 

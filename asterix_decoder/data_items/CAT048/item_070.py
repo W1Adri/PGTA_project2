@@ -35,8 +35,8 @@ class Item070(DataItem):
 
     def _bits_to_data(self, data, V, G, CODE_BITS) -> dict[str, any]:
         data["V_070"] = {
-            0: "Code validated",
-            1: "Code not validated",
+            0: "V", #Code validated
+            1: "Not V", #Code not validated
         }.get(V, None)
 
         data["G_070"] = {
