@@ -28,12 +28,12 @@ class Item020(DataItem):
             "ME_020": None, #   
             "MI_020": None, #
             "FOE_FRI_020": None, #
-            "ADSB_EP": None,  #On-Site ADS-B Information
-            "ADSB_VAL": None,
-            "SCN_EP": None,   #Surveillance Cluster Network Information
-            "SCN_VAL": None,
-            "PA_EP": None,  #Passive Acquisition Interface Information
-            "PA_VAL": None,   
+            # "ADSB_EP": None,  #On-Site ADS-B Information
+            # "ADSB_VAL": None,
+            # "SCN_EP": None,   #Surveillance Cluster Network Information
+            # "SCN_VAL": None,
+            # "PA_EP": None,  #Passive Acquisition Interface Information
+            # "PA_VAL": None,   
         }
 
     @extract_octets
@@ -57,14 +57,14 @@ class Item020(DataItem):
             ME = (o2 >> 4) & 0b1
             MI = (o2 >> 3) & 0b1
             FOE_FRI = (o2 >> 1) & 0b11
-        if len(octets) >= 3:
-            o3 = octets[2]
-            ADSB_EP = (o3 >> 7) & 0b1
-            ADSB_VAL = (o3 >> 6) & 0b1
-            SCN_EP = (o3 >> 5) & 0b1
-            SCN_VAL = (o3 >> 4) & 0b1
-            PA_EP = (o3 >> 3) & 0b1
-            PA_VAL = (o3 >> 2) & 0b1
+        # if len(octets) >= 3:
+        #     o3 = octets[2]
+        #     ADSB_EP = (o3 >> 7) & 0b1
+        #     ADSB_VAL = (o3 >> 6) & 0b1
+        #     SCN_EP = (o3 >> 5) & 0b1
+        #     SCN_VAL = (o3 >> 4) & 0b1
+        #     PA_EP = (o3 >> 3) & 0b1
+        #     PA_VAL = (o3 >> 2) & 0b1
 
         return self._bits_to_data(
             self.data.copy(),
@@ -80,48 +80,48 @@ class Item020(DataItem):
             ME,
             MI,
             FOE_FRI,
-            ADSB_EP,
-            ADSB_VAL,
-            SCN_EP,
-            SCN_VAL,
-            PA_EP,
-            PA_VAL,
+            # ADSB_EP,
+            # ADSB_VAL,
+            # SCN_EP,
+            # SCN_VAL,
+            # PA_EP,
+            # PA_VAL,
         )
             
 
-    def _bits_to_data(self, data, OCTETS_LEN, TYP, SIM, RDP, SPI, RAB, TST, ERR, XPP, ME, MI, FOE_FRI, ADSB_EP, ADSB_VAL, SCN_EP, SCN_VAL, PA_EP, PA_VAL) -> dict[str, any]:
+    def _bits_to_data(self, data, OCTETS_LEN, TYP, SIM, RDP, SPI, RAB, TST, ERR, XPP, ME, MI, FOE_FRI) -> dict[str, any]:
         
         ### FIRST OCTET ###
         data["TYP_020"] = {
-            0b000: "No detection",
-            0b001: "Single PSR detection",
-            0b010: "Single SSR detection",
-            0b011: "SSR + PSR detection",
-            0b100: "Single ModeS All-Call",
-            0b101: "Single ModeS Roll-Call",
-            0b110: "ModeS All-Call + PSR",
-            0b111: "ModeS Roll-Call + PSR",
-        }.get(TYP, "Unknown")
+            0b000: "No detection", #Discart
+            0b001: "PSR", #Discart
+            0b010: "SSR", #Discart
+            0b011: "SSR + PSR", #Discart
+            0b100: "Mode S all call", 
+            0b101: "Mode S roll call",
+            0b110: "Mode S all call + PSR",
+            0b111: "Mode S roll call + PSR",
+        }.get(TYP, None)
         
         data["SIM_020"] = {
             0b0: "Actual target report",
             0b1: "Simulated target report",
-        }.get(SIM, "Unknown")
+        }.get(SIM, None)
         
         data["RDP_020"] = {
             0b0: "Report from RDP Chain 1",
             0b1: "Report from RDP Chain 2",
-        }.get(RDP, "Unknown")
+        }.get(RDP, None)
         
         data["SPI_020"] = {
             0b0: "Absence of SPI",
             0b1: "Special Position Identification",
-        }.get(SPI, "Unknown")
+        }.get(SPI, None)
         
         data["RAB_020"] = {
             0b0: "Report from aircraft transponder",
             0b1: "Report from field monitor (fixed transponder)",
-        }.get(RAB, "Unknown")
+        }.get(RAB, None)
         
         ### SECOND OCTET ###
         if OCTETS_LEN == 1:
@@ -130,68 +130,68 @@ class Item020(DataItem):
         data["TST_020"] = {
             0b0: "Real target report",
             0b1: "Test target report",
-        }.get(TST, "Unknown")
+        }.get(TST, None)
 
         data["ERR_020"] = {
             0b0: "No Extended Range",
             0b1: "Extended Range present",
-        }.get(ERR, "Unknown")
+        }.get(ERR, None)
 
         data["XPP_020"] = {
             0b0: "No X-Pulse present",
             0b1: "X-Pulse present",
-        }.get(XPP, "Unknown")
+        }.get(XPP, None)
 
         data["ME_020"] = {
             0b0: "No military emergency",
             0b1: "Military emergency",
-        }.get(ME, "Unknown")
+        }.get(ME, None)
 
         data["MI_020"] = {
             0b0: "No military identification",
             0b1: "Military identification",
-        }.get(MI, "Unknown")
+        }.get(MI, None)
         
         data["FOE_FRI_020"] = {
             0b00: "No Mode 4 interrogation",
             0b01: "Freindly target",
             0b10: "Unknown target",
             0b11: "No reply",
-        }.get(FOE_FRI, "Unknown")
+        }.get(FOE_FRI, None)
 
-        ### THIRD OCTET ###
-        if OCTETS_LEN == 2:
-            return data
+        # ### THIRD OCTET ###
+        # if OCTETS_LEN == 2:
+        #     return data
         
-        data["ADSB_EP"] = {
-            0b0: "ADSB not populated",
-            0b1: "ADSB populated",
-        }.get(ADSB_EP, "Unknown")
+        # data["ADSB_EP"] = {
+        #     0b0: "ADSB not populated",
+        #     0b1: "ADSB populated",
+        # }.get(ADSB_EP, None)
         
-        data["ADSB_VAL"] = {
-            0b0: "not available",
-            0b1: "available",
-        }.get(ADSB_VAL, "Unknown")
+        # data["ADSB_VAL"] = {
+        #     0b0: "not available",
+        #     0b1: "available",
+        # }.get(ADSB_VAL, None)
         
-        data["SCN_EP"] = {
-            0b0: "SCN not populated",
-            0b1: "SCN populated",
-        }.get(SCN_EP, "Unknown")
+        # data["SCN_EP"] = {
+        #     0b0: "SCN not populated",
+        #     0b1: "SCN populated",
+        # }.get(SCN_EP, None)
         
-        data["SCN_VAL"] = {
-            0b0: "not available",
-            0b1: "available",
-        }.get(SCN_VAL, "Unknown")
+        # data["SCN_VAL"] = {
+        #     0b0: "not available",
+        #     0b1: "available",
+        # }.get(SCN_VAL, None)
         
-        data["PA_EP"] = {
-            0b0: "PA not populated",
-            0b1: "PA populated",
-        }.get(PA_EP, "Unknown")    
+        # data["PA_EP"] = {
+        #     0b0: "PA not populated",
+        #     0b1: "PA populated",
+        # }.get(PA_EP, None)    
         
-        data["PA_VAL"] = {
-            0b0: "not available",
-            0b1: "available",
-        }.get(PA_VAL, "Unknown")
+        # data["PA_VAL"] = {
+        #     0b0: "not available",
+        #     0b1: "available",
+        # }.get(PA_VAL, None)
         return data
         
         

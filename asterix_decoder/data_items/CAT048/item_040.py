@@ -13,10 +13,11 @@ class Item040(DataItem):
         super().__init__(item_name, length_str)
 
         # Position of the radar (if known) - used for lat/lon calculation
-        # LAT_RADAR = 41.3006722780
-        # LON_RADAR = 2.1021244655
-        self.LAT_RADAR = self._dms_to_decimal(41, 18, 2.5284, "N")
-        self.LON_RADAR = self._dms_to_decimal(2, 6, 7.4095, "E")
+        self.LAT_RADAR = 41.3006963
+        
+        self.LON_RADAR = 2.1020662
+        # self.LAT_RADAR = self._dms_to_decimal(41, 18, 2.5284, "N")
+        # self.LON_RADAR = self._dms_to_decimal(2, 6, 7.4095, "E")
 
         self.data = {
             "RHO": None, # NM 
@@ -35,8 +36,8 @@ class Item040(DataItem):
         rho_nm = rho_raw / 256.0
         theta_deg = theta_raw * 360.0 / 65536.0
 
-        data["RHO"] = rho_nm
-        data["THETA"] = theta_deg
+        data["RHO"] = round(rho_nm, 6)
+        data["THETA"] = round(theta_deg, 6)
 
         # Only calculate lat/lon if radar position is known
         if self.LAT_RADAR is not None and self.LON_RADAR is not None:
@@ -46,8 +47,8 @@ class Item040(DataItem):
                 rho_nm=rho_nm,
                 theta_deg=theta_deg
             )
-            data["LAT"] = lat
-            data["LON"] = lon
+            data["LAT"] = round(lat , 8)
+            data["LON"] = round(lon, 8)
 
         return data
 

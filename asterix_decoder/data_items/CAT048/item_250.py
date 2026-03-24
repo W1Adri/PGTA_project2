@@ -26,36 +26,21 @@ class Item250(DataItem):
     def __init__(self, item_name: str, length_type):
         super().__init__(item_name, length_type)
         self.data = {
-            "MCP_ALT_STATUS":             None,
             "MCP_ALT":                    None, #
-            "FMS_ALT_STATUS":             None,
             "FMS_ALT":                    None, # 
-            "BR_STATUS":                  None,
             "BP":                         None, # Baro Pressure
             "VNAV":                       None, # 
             "ALT_HOLD":                   None, #
             "APP":                        None, # Aproach mode
-            "TARGET_ALT_SOURCE_STATUS":   None,
-            "TARGET_ALT_SOURCE":          None,
-            "RA_STATUS":                  None,
             "RA":                         None, # Roll Angle
-            "TTA_STATUS":                 None,
             "TTA":                        None, # True Track Angle degree
-            "GS_STATUS":                  None,
             "GS":                         None, # Ground Speed kt
-            "TAR_STATUS":                 None,
             "TAR":                        None, # Track Angle Rate degree/s
-            "TAS_STATUS":                 None,
             "TAS":                         None, # True Airspeed kt
-            "HDG_STATUS":                   None,
             "HDG":                          None, # Magnetic Heading degree [-180 - 180]
-            "IAS_STATUS":                   None,
             "IAS":                          None, # Indicated Airspeed kt
-            "MACH_STATUS":                  None,
             "MACH":                         None, #
-            "BAR_STATUS":                   None,
             "BAR":                          None, # Barometric Altitude Rate ft/min
-            "IVV_STATUS":                   None,
             "IVV":                          None, # Inertial Vertical Velocity ft/min
             
         }
@@ -163,16 +148,12 @@ class Item250(DataItem):
         TARGET_ALT_SOURCE        = TARGET_ALT_SOURCE_RAW if TARGET_ALT_SOURCE_STATUS else None
 
         return {
-            "MCP_STATUS":                 bool(MCP_STATUS),
             "MCP":                        MCP_ALTITUDE_FT,
-            "FMS_ALT_STATUS":             bool(FMS_STATUS),
             "FMS_ALT":                    FMS_ALTITUDE_FT,
-            "BP_STATUS":                  bool(BARO_STATUS),
             "BP":                         BARO_SETTING_MB,
             "VNAV":                       VNAV_MODE,
             "ALT_HOLD":                   ALT_HOLD_MODE,
             "APP":                        APPROACH_MODE,
-            "TARGET_ALT_SOURCE_STATUS":   bool(TARGET_ALT_SOURCE_STATUS),
             "TARGET_ALT_SOURCE":          TARGET_ALT_SOURCE,
         }
 
@@ -202,22 +183,18 @@ class Item250(DataItem):
         ROLL_STATUS   = self._bit(BITS, 1)
         ROLL_SIGN     = self._bit(BITS, 2)
         ROLL_RAW      = self._bits_range(BITS, 3, 11)
-        if ROLL_STATUS:
-            ROLL_ANGLE_DEG = round(ROLL_RAW * (45 / 256), 2)
-            if ROLL_SIGN:
-                ROLL_ANGLE_DEG = -ROLL_ANGLE_DEG
-        else:
-            ROLL_ANGLE_DEG = None
-
+        ROLL_ANGLE_DEG = round(ROLL_RAW * (45 / 256), 2)
+        if ROLL_SIGN:
+            ROLL_ANGLE_DEG = -ROLL_ANGLE_DEG
+        ROLL_ANGLE_DEG = ROLL_ANGLE_DEG if ROLL_STATUS else None
+        
         # ── True Track Angle ───────────────────────────────────────────
         TTA_STATUS = self._bit(BITS, 12)
         TTA_SIGN   = self._bit(BITS, 13)
         TTA_RAW    = self._bits_range(BITS, 14, 23)
-        if TTA_STATUS:
-            TTA_BASE = round(TTA_RAW * (90 / 512), 2)
-            TRUE_TRACK_ANGLE_DEG = round(180.0 + TTA_BASE if TTA_SIGN else TTA_BASE, 2)
-        else:
-            TRUE_TRACK_ANGLE_DEG = None
+        TTA_BASE = round(TTA_RAW * (90 / 512), 2)
+        TRUE_TRACK_ANGLE_DEG = round(180.0 + TTA_BASE if TTA_SIGN else TTA_BASE, 2)
+        TRUE_TRACK_ANGLE_DEG = TRUE_TRACK_ANGLE_DEG if TTA_STATUS else None
 
         # ── Ground Speed ───────────────────────────────────────────────
         GS_STATUS     = self._bit(BITS, 24)
@@ -228,12 +205,10 @@ class Item250(DataItem):
         TAR_STATUS = self._bit(BITS, 35)
         TAR_SIGN   = self._bit(BITS, 36)
         TAR_RAW    = self._bits_range(BITS, 37, 45)
-        if TAR_STATUS:
-            TRACK_ANGLE_RATE_DEG_S = round(TAR_RAW * (8 / 256), 4)
-            if TAR_SIGN:
-                TRACK_ANGLE_RATE_DEG_S = -TRACK_ANGLE_RATE_DEG_S
-        else:
-            TRACK_ANGLE_RATE_DEG_S = None
+        TRACK_ANGLE_RATE_DEG_S = round(TAR_RAW * (8 / 256), 4)
+        if TAR_SIGN:
+            TRACK_ANGLE_RATE_DEG_S = -TRACK_ANGLE_RATE_DEG_S
+        TRACK_ANGLE_RATE_DEG_S = TRACK_ANGLE_RATE_DEG_S if TAR_STATUS else None
 
         # ── True Airspeed ──────────────────────────────────────────────
         TAS_STATUS    = self._bit(BITS, 46)
@@ -241,15 +216,10 @@ class Item250(DataItem):
         TRUE_AIRSPEED_KT = TAS_RAW * 2 if TAS_STATUS else None
 
         return {
-            "RA_STATUS":                  bool(ROLL_STATUS),
             "RA":                         ROLL_ANGLE_DEG,
-            "TTA_STATUS":                 bool(TTA_STATUS),
             "TTA":                        TRUE_TRACK_ANGLE_DEG,
-            "GS_STATUS":                  bool(GS_STATUS),
             "GS":                         GROUND_SPEED_KT,
-            "TAR_STATUS":                 bool(TAR_STATUS),
             "TAR":                        TRACK_ANGLE_RATE_DEG_S,
-            "TAS_STATUS":                 bool(TAS_STATUS),
             "TAS":                        TRUE_AIRSPEED_KT,
         }
 
@@ -279,11 +249,9 @@ class Item250(DataItem):
         MH_STATUS = self._bit(BITS, 1)
         MH_SIGN   = self._bit(BITS, 2)
         MH_RAW    = self._bits_range(BITS, 3, 12)
-        if MH_STATUS:
-            MH_BASE = round(MH_RAW * (90 / 512), 6)
-            MAGNETIC_HEADING_DEG = -1 * MH_BASE if MH_SIGN else MH_BASE, 6
-        else:
-            MAGNETIC_HEADING_DEG = None
+        MH_BASE = round(MH_RAW * (90 / 512), 6)
+        MAGNETIC_HEADING_DEG = -1 * MH_BASE if MH_SIGN else MH_BASE, 6
+        MAGNETIC_HEADING_DEG = MAGNETIC_HEADING_DEG if MH_STATUS else None
 
         # ── Indicated Airspeed ─────────────────────────────────────────
         IAS_STATUS  = self._bit(BITS, 13)
@@ -299,12 +267,12 @@ class Item250(DataItem):
         BAR_STATUS = self._bit(BITS, 35)
         BAR_SIGN   = self._bit(BITS, 36)
         BAR_RAW    = self._bits_range(BITS, 37, 45)
-        if BAR_STATUS:
-            BARO_ALT_RATE_FPM = BAR_RAW * 32
-            if BAR_SIGN:
-                BARO_ALT_RATE_FPM = -BARO_ALT_RATE_FPM
-        else:
-            BARO_ALT_RATE_FPM = None
+        
+        BARO_ALT_RATE_FPM = BAR_RAW * 32
+        if BAR_SIGN:
+            BARO_ALT_RATE_FPM = -BARO_ALT_RATE_FPM
+        BARO_ALT_RATE_FPM = BARO_ALT_RATE_FPM if BAR_STATUS else None
+        
 
         # ── Inertial Vertical Velocity ─────────────────────────────────
         IVV_STATUS = self._bit(BITS, 46)
@@ -318,14 +286,9 @@ class Item250(DataItem):
             INERTIAL_VERT_VELOCITY_FPM = None
 
         return {
-            "HDG_STATUS":                   bool(MH_STATUS),
             "HDG":                          MAGNETIC_HEADING_DEG,
-            "IAS_STATUS":                   bool(IAS_STATUS),
             "IAS":                          INDICATED_AIRSPEED_KT,
-            "MACH_STATUS":                  bool(MACH_STATUS),
             "MACH":                         MACH_NUMBER,
-            "BAR_STATUS":                   bool(BAR_STATUS),
             "BAR":                          BARO_ALT_RATE_FPM,
-            "IVV_STATUS":                   bool(IVV_STATUS),
             "IVV":                          INERTIAL_VERT_VELOCITY_FPM,
         }

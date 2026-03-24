@@ -17,8 +17,8 @@ class Item200(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "GROUNDSPEED_NM_S": None,
-            "HEADING_DEG": None,
+            "GS_KT": None, #
+            "HEADING": None, #
         }
 
     @extract_octets
@@ -28,8 +28,8 @@ class Item200(DataItem):
         return self._bits_to_data(self.data.copy(), GROUNDSPEED, HEADING)
 
     def _bits_to_data(self, data, GROUNDSPEED, HEADING) -> dict[str, any]:
-        GROUNDSPEED_NM_S = GROUNDSPEED / float(1 << 14)
+        GROUNDSPEED_KT = GROUNDSPEED / float(1 << 14)
 
-        data["GROUNDSPEED_NM_S"] = GROUNDSPEED_NM_S
-        data["HEADING_DEG"] = HEADING * 360.0 / 65536.0
+        data["GS_KT"] = round(GROUNDSPEED_KT * 0.22, 1)
+        data["HEADING"] = round(HEADING * 360.0 / 65536.0, 4)
         return data

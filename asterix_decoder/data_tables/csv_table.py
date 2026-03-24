@@ -1,6 +1,6 @@
 
 CSV_CAT021_COLUMNS = [
-    "CAT", "SAC", "SIC", "Time", 
+    "CAT", "SAC", "SIC", "TIME", 
     "LAT", "LON", "H(m)", "H(ft)",
     "RHO", "THETA", 
     "Mode_3/A", 

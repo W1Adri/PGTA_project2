@@ -18,15 +18,15 @@ class Item170(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "CNF": None,
-            "RAD": None,
-            "DOU": None,
-            "MAH": None,
-            "CDM": None,
-            "TRE": None,
-            "GHO": None,
-            "SUP": None,
-            "TCC": None
+            "CNF_170": None, #
+            "RAD_170": None, #
+            "DOU_170": None, #
+            "MAH_170": None, #
+            "CDM_170": None, #
+            "TRE_170": None, #
+            "GHO_170": None, #
+            "SUP_170": None, #
+            "TCC_170": None, #
         }
 
     @extract_octets
@@ -52,57 +52,57 @@ class Item170(DataItem):
 
     def _bits_to_data(self, data, OCTETS_LEN, CNF, RAD, DOU, MAH, CDM, TRE, GHO, SUP, TCC) -> dict[str, any]:
         ### FIRST OCTET ###
-        data["CNF"] = {
+        data["CNF_170"] = {
             0: "Confirmed Track",
             1: "Tentative Track",
-        }.get(CNF, "Unknown")
+        }.get(CNF, None)
 
-        data["RAD"] = {
+        data["RAD_170"] = {
             0b00: "Combined Track",
             0b01: "PSR Track",
             0b10: "SSR/Mode S Track",
             0b11: "Invalid",
-        }.get(RAD, "Unknown")
+        }.get(RAD, None)
 
-        data["DOU"] = {
+        data["DOU_170"] = {
             0: "Normal confidence",
             1: "Low confidence in plot to track association",
-        }.get(DOU, "Unknown")
+        }.get(DOU, None)
 
-        data["MAH"] = {
+        data["MAH_170"] = {
             0: "No horizontal man. sensed",
             1: "Horizontal man. sensed",
-        }.get(MAH, "Unknown")
+        }.get(MAH, None)
 
-        data["CDM"] = {
+        data["CDM_170"] = {
             0b00: "Maintaining",
             0b01: "Climbing",
             0b10: "Descending",
             0b11: "Unknown",
-        }.get(CDM, "Unknown")
+        }.get(CDM, None)
 
         ### SECOND OCTET ###
         if OCTETS_LEN == 1:
             return data
         
-        data["TRE"] = {
+        data["TRE_170"] = {
             0: "Track still alive",
             1: "End of track lifetime (last report for this track)",
-        }.get(TRE, "Unknown")
+        }.get(TRE, None)
 
-        data["GHO"] = {
+        data["GHO_170"] = {
             0: "True target track",
             1: "Ghost target track",
-        }.get(GHO, "Unknown")
+        }.get(GHO, None)
 
-        data["SUP"] = {
+        data["SUP_170"] = {
             0: "No",
             1: "Yes",
-        }.get(SUP, "Unknown")
+        }.get(SUP, None)
 
-        data["TCC"] = {
+        data["TCC_170"] = {
             0: "Tracking performed in Radar Plane",
             1: "Slant range correction and projection into a 2D reference plane applied",
-        }.get(TCC, "Unknown")
+        }.get(TCC, None)
         return data
 

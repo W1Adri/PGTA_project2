@@ -18,14 +18,14 @@ class Item230(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "COM": None,
-            "STAT": None,
-            "SI": None,
-            "MSSC": None,
-            "ARC": None,
-            "AIC": None,
-            "B1A": None,
-            "B1B": None,
+            "COM_230": None,
+            "STAT_230": None,
+            "SI_230": None,
+            "MSSC_230": None,
+            "ARC_230": None,
+            "AIC_230": None,
+            "B1A_230": None,
+            "B1B_230": None,
         }
 
     @extract_octets
@@ -44,7 +44,7 @@ class Item230(DataItem):
         return self._bits_to_data(self.data.copy(), COM, STAT, SI, MSSC, ARC, AIC, B1A, B1B)
 
     def _bits_to_data(self, data, COM, STAT, SI, MSSC, ARC, AIC, B1A, B1B) -> dict[str, any]:
-        data["COM"] = {
+        data["COM_230"] = {
             0: "No communications capability (surveillance only)",
             1: "Comm. A and Comm. B capability",
             2: "Comm. A, Comm. B and Uplink ELM",
@@ -53,9 +53,9 @@ class Item230(DataItem):
             5: "Not assigned",
             6: "Not assigned",
             7: "Not assigned",
-        }.get(COM, "Unknown")
+        }.get(COM, None)
 
-        data["STAT"] = {
+        data["STAT_230"] = {
             0: "No alert, no SPI, aircraft airborne",
             1: "No alert, no SPI, aircraft on ground",
             2: "Alert, no SPI, aircraft airborne",
@@ -64,28 +64,28 @@ class Item230(DataItem):
             5: "No alert, SPI, aircraft airborne or on ground",
             6: "Not assigned",
             7: "Unknown",
-        }.get(STAT, "Unknown")
+        }.get(STAT, None)
 
-        data["SI"] = {
+        data["SI_230"] = {
             0: "SI-Code Capable",
             1: "II-Code Capable",
-        }.get(SI, "Unknown")
+        }.get(SI, None)
 
-        data["MSSC"] = {
+        data["MSSC_230"] = {
             0: "No",
             1: "Yes",
-        }.get(MSSC, "Unknown")
+        }.get(MSSC, None)
 
-        data["ARC"] = {
+        data["ARC_230"] = {
             0: "100 ft resolution",
             1: "25 ft resolution",
-        }.get(ARC, "Unknown")
+        }.get(ARC, None)
 
-        data["AIC"] = {
+        data["AIC_230"] = {
             0: "No",
             1: "Yes",
-        }.get(AIC, "Unknown")
+        }.get(AIC, None)
 
-        data["B1A"] = B1A
-        data["B1B"] = B1B
+        data["B1A_230"] = B1A
+        data["B1B_230"] = B1B
         return data
