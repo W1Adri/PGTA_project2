@@ -18,6 +18,8 @@ class Item010(DataItem):
         super().__init__(item_name, length_str)
         self.data = {
             "RAW_HEX": None,
+            "SAC": None,
+            "SIC": None,
         }
 
     @extract_octets
@@ -25,5 +27,10 @@ class Item010(DataItem):
         return self._bits_to_data(self.data.copy(), octets)
 
     def _bits_to_data(self, data, octets: bytes) -> dict[str, any]:
+        # Expect exactly 2 octets: [SAC][SIC]
         data["RAW_HEX"] = octets.hex().upper()
+        if len(octets) >= 1:
+            data["SAC"] = int(octets[0])
+        if len(octets) >= 2:
+            data["SIC"] = int(octets[1])
         return data

@@ -18,6 +18,8 @@ class Item080(DataItem):
         super().__init__(item_name, length_str)
         self.data = {
             "RAW_HEX": None,
+            "TARGET_ADDRESS": None,
+            "TARGET_ADDRESS_HEX": None,
         }
 
     @extract_octets
@@ -25,5 +27,10 @@ class Item080(DataItem):
         return self._bits_to_data(self.data.copy(), octets)
 
     def _bits_to_data(self, data, octets: bytes) -> dict[str, any]:
+        # Expect 3 octets representing a 24-bit target address (A23..A0)
         data["RAW_HEX"] = octets.hex().upper()
+        if len(octets) >= 1:
+            # interpret up to 3 octets as big-endian integer
+            data["TARGET_ADDRESS"] = int.from_bytes(octets[:3], byteorder="big")
+            data["TARGET_ADDRESS_HEX"] = f"{data['TARGET_ADDRESS']:06X}"
         return data
