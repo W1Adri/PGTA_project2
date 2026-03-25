@@ -31,7 +31,7 @@ def extract_octets(func: Callable) -> Callable:
     5. Calls the item's real decode with raw_bytes
     """
     @wraps(func)
-    def wrapper(self, unextracted_octets: bytes) -> int:
+    def wrapper(self, unextracted_octets: bytes, **kwargs) -> int:
         if not isinstance(self.length_type, LengthType):
             raise AsterixDecodeError(
                 f"{self.item_id}: invalid length_type -> {self.length_type}"
@@ -68,7 +68,7 @@ def extract_octets(func: Callable) -> Callable:
             ) from exc
 
         # Calls the REAL decode of the item with the trimmed bytes
-        decoded_data = func(self, octets)
+        decoded_data = func(self, octets, **kwargs)
 
         return next_cursor, decoded_data
 

@@ -47,7 +47,7 @@ class Item090(DataItem):
         fl_signed = self._twos_complement(FL, 14)
         data["FL"] = fl_signed / 4.0
         data["H(ft)"] = int(data["FL"] * 100)  # Convert flight level to feet
-        data["H(m)"] = round((data['H(ft)'] * 0.3048), 1)  # Convert feet to meters
+        data["H(m)"] = round((data['H(ft)'] * 0.3048), 2)  # Convert feet to meters
         return data
     
     def _twos_complement(self, value: int, bits: int) -> int:

@@ -1,4 +1,2 @@
 class AsterixDecodeError(Exception):
-    
-    
     pass

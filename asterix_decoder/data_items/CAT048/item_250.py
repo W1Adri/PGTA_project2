@@ -125,17 +125,17 @@ class Item250(DataItem):
         # ── MCP/FCU Selected Altitude ──────────────────────────────────
         MCP_STATUS   = self._bit(BITS, 1)
         MCP_RAW      = self._bits_range(BITS, 2, 13)
-        MCP_ALTITUDE_FT = MCP_RAW * 16 if MCP_STATUS else None
+        MCP_ALTITUDE_FT = str(MCP_RAW * 16).replace(".", ",") if MCP_STATUS else None
 
         # ── FMS Selected Altitude ──────────────────────────────────────
         FMS_STATUS   = self._bit(BITS, 14)
         FMS_RAW      = self._bits_range(BITS, 15, 26)
-        FMS_ALTITUDE_FT = FMS_RAW * 16 if FMS_STATUS else None
+        FMS_ALTITUDE_FT = str(FMS_RAW * 16).replace(".", ",") if FMS_STATUS else None
 
         # ── Barometric Pressure Setting ────────────────────────────────
         BARO_STATUS  = self._bit(BITS, 27)
         BARO_RAW     = self._bits_range(BITS, 28, 39)
-        BARO_SETTING_MB = round(BARO_RAW * 0.1 + 800, 1) if BARO_STATUS else None
+        BARO_SETTING_MB = str(round(BARO_RAW * 0.1 + 800, 1)).replace(".", ",") if BARO_STATUS else None
 
         # ── Autopilot Mode Flags ───────────────────────────────────────
         VNAV_MODE     = int(self._bit(BITS, 41))
@@ -181,29 +181,28 @@ class Item250(DataItem):
         ROLL_STATUS   = self._bit(BITS, 1)
         ROLL_RAW      = self._twos_complement(self._bits_range(BITS, 2, 11), 10)
         ROLL_ANGLE_DEG = round(ROLL_RAW * (45 / 256), 3)
-        ROLL_ANGLE_DEG = ROLL_ANGLE_DEG if ROLL_STATUS else "NV"
+        ROLL_ANGLE_DEG = str(ROLL_ANGLE_DEG).replace(".", ",") if ROLL_STATUS else "NV"
         
         # ── True Track Angle ───────────────────────────────────────────
         TTA_STATUS = self._bit(BITS, 12)
         TTA_RAW    = self._twos_complement(self._bits_range(BITS, 13, 23), 11)
         TRUE_TRACK_ANGLE_DEG = round(TTA_RAW * (90 / 512), 3)
-        TRUE_TRACK_ANGLE_DEG = TRUE_TRACK_ANGLE_DEG if TTA_STATUS else "NV"
+        TRUE_TRACK_ANGLE_DEG = str(TRUE_TRACK_ANGLE_DEG).replace(".", ",") if TTA_STATUS else "NV"
 
         # ── Ground Speed ───────────────────────────────────────────────
         GS_STATUS     = self._bit(BITS, 24)
         GS_RAW        = self._bits_range(BITS, 25, 34)
-        GROUND_SPEED_KT = GS_RAW * 2 if GS_STATUS else "NV"
+        GROUND_SPEED_KT = str(GS_RAW * 2).replace(".", ",") if GS_STATUS else "NV"
 
         # ── Track Angle Rate ───────────────────────────────────────────
         TAR_STATUS = self._bit(BITS, 35)
         TAR_RAW    = self._twos_complement(self._bits_range(BITS, 36, 45), 10)
-        TRACK_ANGLE_RATE_DEG_S = round(TAR_RAW * (8 / 256), 3)
-        TRACK_ANGLE_RATE_DEG_S = TRACK_ANGLE_RATE_DEG_S if TAR_STATUS else "NV"
+        TRACK_ANGLE_RATE_DEG_S = str(round(TAR_RAW * (8 / 256), 3)).replace(".", ",") if TAR_STATUS else "NV"
 
         # ── True Airspeed ──────────────────────────────────────────────
         TAS_STATUS    = self._bit(BITS, 46)
         TAS_RAW       = self._bits_range(BITS, 47, 56)
-        TRUE_AIRSPEED_KT = TAS_RAW * 2 if TAS_STATUS else "NV"
+        TRUE_AIRSPEED_KT = str(TAS_RAW * 2).replace(".", ",") if TAS_STATUS else "NV"
 
         return {
             "RA":                         ROLL_ANGLE_DEG,
@@ -240,30 +239,30 @@ class Item250(DataItem):
         MH_RAW    = self._twos_complement(self._bits_range(BITS, 2, 12), 11)
 
         MAGNETIC_HEADING_DEG = round((MH_RAW * (90 / 512)), 6)
-        MAGNETIC_HEADING_DEG = MAGNETIC_HEADING_DEG if MH_STATUS else "NV"
+        MAGNETIC_HEADING_DEG = str(MAGNETIC_HEADING_DEG).replace(".", ",") if MH_STATUS else "NV"
 
         # ── Indicated Airspeed ─────────────────────────────────────────
         IAS_STATUS  = self._bit(BITS, 13)
         IAS_RAW     = self._bits_range(BITS, 14, 23)
-        INDICATED_AIRSPEED_KT = IAS_RAW if IAS_STATUS else "NV"
+        INDICATED_AIRSPEED_KT = str(IAS_RAW).replace(".", ",") if IAS_STATUS else "NV"
 
         # ── Mach Number ────────────────────────────────────────────────
         MACH_STATUS = self._bit(BITS, 24)
         MACH_RAW    = self._bits_range(BITS, 25, 34)
-        MACH_NUMBER = round(MACH_RAW * 0.004, 3) if MACH_STATUS else "NV"
+        MACH_NUMBER = str(round(MACH_RAW * 0.004, 3)).replace(".", ",") if MACH_STATUS else "NV"
 
         # ── Barometric Altitude Rate ───────────────────────────────────
         BAR_STATUS = self._bit(BITS, 35)
         BAR_RAW    = self._twos_complement(self._bits_range(BITS, 37, 45), 9)
         BARO_ALT_RATE_FPM = BAR_RAW * 32
-        BARO_ALT_RATE_FPM = BARO_ALT_RATE_FPM if BAR_STATUS else "NV"
+        BARO_ALT_RATE_FPM = str(BARO_ALT_RATE_FPM).replace(".", ",") if BAR_STATUS else "NV"
         
 
         # ── Inertial Vertical Velocity ─────────────────────────────────
         IVV_STATUS = self._bit(BITS, 46)
         IVV_RAW    = self._twos_complement(self._bits_range(BITS, 47, 56), 10)
         INERTIAL_VERT_VELOCITY_FPM = IVV_RAW * 32
-        INERTIAL_VERT_VELOCITY_FPM = INERTIAL_VERT_VELOCITY_FPM if IVV_STATUS else "NV"
+        INERTIAL_VERT_VELOCITY_FPM = str(INERTIAL_VERT_VELOCITY_FPM).replace(".", ",") if IVV_STATUS else "NV"
 
         return {
             "HDG":                          MAGNETIC_HEADING_DEG,
