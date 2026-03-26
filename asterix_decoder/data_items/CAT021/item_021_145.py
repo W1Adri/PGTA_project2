@@ -38,13 +38,13 @@ class Item145(DataItem):
     def _bits_to_data(self, data, octets: bytes) -> dict[str, any]:
         data["RAW_HEX"] = octets.hex().upper()
 
-        # Expect 2 octets; interpret as 16-bit big-endian two's complement
+        # Expect 2 octets; pad with leading zeros if needed for proper two's complement
         if len(octets) < 2:
-            raw_int = int.from_bytes(octets, byteorder="big")
-        else:
-            raw_int = int.from_bytes(octets[:2], byteorder="big")
+            octets = b'\x00' * (2 - len(octets)) + octets
+        
+        raw_int = int.from_bytes(octets[:2], byteorder="big")
 
-        # Convert to signed 16-bit
+        # Convert to signed 16-bit two's complement
         if raw_int & 0x8000:
             signed = raw_int - 0x10000
         else:
