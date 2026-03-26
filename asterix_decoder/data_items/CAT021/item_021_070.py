@@ -66,4 +66,7 @@ class Item070(DataItem):
         data["D3"] = int(d3)
         data["D4"] = int(d4)
 
+        # CSV alias: populate the CSV column name expected by the exporter
+        data["Mode_3/A"] = octal_str
+
         return data

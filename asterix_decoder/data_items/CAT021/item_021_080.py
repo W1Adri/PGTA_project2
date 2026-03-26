@@ -33,4 +33,8 @@ class Item080(DataItem):
             # interpret up to 3 octets as big-endian integer
             data["TARGET_ADDRESS"] = int.from_bytes(octets[:3], byteorder="big")
             data["TARGET_ADDRESS_HEX"] = f"{data['TARGET_ADDRESS']:06X}"
+
+            # CSV alias: populate expected CSV column 'TA'
+            data["TA"] = data["TARGET_ADDRESS_HEX"]
+
         return data

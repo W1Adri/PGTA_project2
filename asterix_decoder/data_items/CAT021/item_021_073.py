@@ -76,4 +76,8 @@ class Item073(DataItem):
         data["SECOND"] = int(sec)
         data["MILLISECOND"] = int(msec)
 
+        # CSV aliases: populate CSV columns expected by exporter
+        data["TIME"] = time_utc
+        data["TI"] = time_utc
+
         return data
