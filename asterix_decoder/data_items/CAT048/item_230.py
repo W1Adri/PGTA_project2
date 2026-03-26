@@ -86,6 +86,6 @@ class Item230(DataItem):
             1: "YES",
         }.get(AIC, None)
 
-        data["B1A_230"] = f"BDS 1,0 bit16={bin(B1A)}"
-        data["B1B_230"] = f"BDS 1,0 bit37/40={bin(B1B)}"
+        data["B1A_230"] = f"BDS 1,0 bit16={B1A:01b}"
+        data["B1B_230"] = f"BDS 1,0 bits 37/40={B1B:04b}"
         return data

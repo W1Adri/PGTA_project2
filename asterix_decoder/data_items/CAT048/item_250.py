@@ -146,7 +146,7 @@ class Item250(DataItem):
         TARGET_ALT_SOURCE_STATUS = int(self._bit(BITS, 54))
 
         return {
-            "MCP_ALT":                        MCP_ALTITUDE_FT,
+            "MCP_ALT":                    MCP_ALTITUDE_FT,
             "FMS_ALT":                    FMS_ALTITUDE_FT,
             "BP":                         BARO_SETTING_MB,
             "VNAV":                       VNAV_MODE,

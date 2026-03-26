@@ -37,12 +37,12 @@ class Item090(DataItem):
         data["V_090"] = {
             0: "V", #Code validated
             1: "Not V", #Code not validated
-        }.get(V, "Unknown")
+        }.get(V, None)
 
         data["G_090"] = {
             0: "Default",
             1: "Garbled code",
-        }.get(G, "Unknown")
+        }.get(G, None)
 
         fl_signed = self._twos_complement(FL, 14)
         data["FL"] = fl_signed / 4.0

@@ -102,7 +102,7 @@ class Item130(DataItem):
 
     def _bits_to_data(self, data, SRL, SRR, SAM, PRL, PAM, RPD, APD) -> dict[str, any]:
         if SRL is not None:
-            data["SRL_130"] = f"{round(SRL * 360.0 / 8192.0, 3):.3f} dg".replace(".", ",")
+            data["SRL_130"] = f"{round(SRL * 0.044, 3):.3f} dg".replace(".", ",")
 
         if SRR is not None:
             data["SSR_130"] = SRR
@@ -111,16 +111,16 @@ class Item130(DataItem):
             data["SAM_130"] = f"{round(self._twos_complement(SAM, 8))} dBm"
 
         if PRL is not None:
-            data["PRL_130"] = f"{round(PRL * 360.0 / 8192.0, 3):.3f} dg".replace(".", ",")
+            data["PRL_130"] = f"{round(PRL * 0.044, 3)} dg".replace(".", ",")
 
         if PAM is not None:
-            data["PAM_130"] = f"{round(self._twos_complement(PAM, 8), 3):.3f} dBm".replace(".", ",")
+            data["PAM_130"] = f"{round(self._twos_complement(PAM, 8), 3)} dBm".replace(".", ",")
 
         if RPD is not None:
             data["RPD_130"] = f"{round((self._twos_complement(RPD, 8) / 256.0), 3):.3f} NM".replace(".", ",")
 
         if APD is not None:
-            data["APD_130"] = f"{round((self._twos_complement(APD, 8) * 360.0 / 16384.0), 3):.3f} dg".replace(".", ",")  
+            data["APD_130"] = f"{round((self._twos_complement(APD, 8) * 360.0 / 16384.0), 3)} dg".replace(".", ",")  
         return data
 
 
