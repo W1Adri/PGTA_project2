@@ -1,27 +1,37 @@
 import math
 
 # -----------------------------
+# POSITION OF THE RADAR
+# -----------------------------
+
+LAT_RADAR = 41.30070234
+LON_RADAR = 2.10205817
+H_RADAR = 27.09296262
+
+
+# -----------------------------
 # C# GeodeticUtils.cs constants
 # -----------------------------
+
 A = 6378137.0
 B = 6356752.3142
 E2 = 0.00669437999013
 NM2METERS = 1852.0
+FT2METERS = 0.3048
 DEG2RAD = math.pi / 180.0
 RAD2DEG = 180.0 / math.pi
 ALMOST_ZERO = 1e-10
 REQUIRED_PRECISION = 1e-8
 
-
 # -----------------------------
-# Réplica exacta de GeoUtils.cs
+# Exact clone of GeoUtils.cs
 # -----------------------------
-def _calculate_earth_radius(lat_rad):
+def _calculate_earth_radius(self, lat_rad):
     # Radius of curvature in meridian
-    return (A * (1.0 - E2)) / ((1.0 - E2 * (math.sin(lat_rad) ** 2.0)) ** 1.5)
+    return (self.A * (1.0 - self.E2)) / ((1.0 - self.E2 * (math.sin(lat_rad) ** 2.0)) ** 1.5)
 
-def _calculate_elevation(center_height, R, rho_m, h_target):
-    if rho_m < ALMOST_ZERO:
+def _calculate_elevation(self, center_height, R, rho_m, h_target):
+    if rho_m < self.ALMOST_ZERO:
         return 0.0
 
     temp = (
@@ -36,7 +46,7 @@ def _calculate_elevation(center_height, R, rho_m, h_target):
     else:
         return math.pi / 2.0
 
-def _radar_spherical_to_radar_cartesian(rho_m, theta_rad, elevation_rad):
+def _radar_spherical_to_radar_cartesian(self, rho_m, theta_rad, elevation_rad):
     x = rho_m * math.cos(elevation_rad) * math.sin(theta_rad)
     y = rho_m * math.cos(elevation_rad) * math.cos(theta_rad)
     z = rho_m * math.sin(elevation_rad)
@@ -46,11 +56,11 @@ def _calculate_rotation_matrix(lat_rad, lon_rad):
     return [
         [-math.sin(lon_rad),  math.cos(lon_rad), 0.0],
         [-(math.sin(lat_rad) * math.cos(lon_rad)),
-         -(math.sin(lat_rad) * math.sin(lon_rad)),
-          math.cos(lat_rad)],
+        -(math.sin(lat_rad) * math.sin(lon_rad)),
+        math.cos(lat_rad)],
         [ math.cos(lat_rad) * math.cos(lon_rad),
-          math.cos(lat_rad) * math.sin(lon_rad),
-          math.sin(lat_rad)]
+        math.cos(lat_rad) * math.sin(lon_rad),
+        math.sin(lat_rad)]
     ]
 
 def _calculate_translation_matrix(lat_rad, lon_rad, h_m):
@@ -106,16 +116,19 @@ def _geocentric_to_geodesic(X, Y, Z):
     lon = math.atan2(Y, X)
     return lat, lon, h
 
-def compute_target(lat_ref_deg, lon_ref_deg, h_ref_m, rho_nm, theta_deg, FL_target):
-    lat_ref = lat_ref_deg * DEG2RAD
-    lon_ref = lon_ref_deg * DEG2RAD
+
+def compute_target_lat_lon(rho_nm, theta_deg, FL):
+    if FL is None:
+        FL = 0
+    lat_ref = LAT_RADAR * DEG2RAD
+    lon_ref = LON_RADAR * DEG2RAD
     rho_m = rho_nm * NM2METERS
     theta_rad = theta_deg * DEG2RAD
-    h_target_m = FL_target * 100.0 * 0.3048  # Convert FL to meters
+    h_target_m = FL * 100.0 * FT2METERS  # Convert FL to meters
     R = _calculate_earth_radius(lat_ref)
-    elev = _calculate_elevation(h_ref_m, R, rho_m, h_target_m)
+    elev = _calculate_elevation(H_RADAR, R, rho_m, h_target_m)
     x, y, z = _radar_spherical_to_radar_cartesian(rho_m, theta_rad, elev)
-    X, Y, Z = _radar_cartesian_to_geocentric(lat_ref, lon_ref, h_ref_m, x, y, z)
-    lat_rad, lon_rad, h_out = _geocentric_to_geodesic(X, Y, Z)
+    X, Y, Z = _radar_cartesian_to_geocentric(lat_ref, lon_ref, H_RADAR, x, y, z)
+    lat_rad, lon_rad = _geocentric_to_geodesic(X, Y, Z)
 
-    return lat_rad * RAD2DEG, lon_rad * RAD2DEG #, h_out, elev * RAD2DEG
+    return round(lat_rad * RAD2DEG, 8), round(lon_rad * RAD2DEG, 8) #, h_out, elev * RAD2DEG

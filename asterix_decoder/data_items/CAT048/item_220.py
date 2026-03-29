@@ -17,8 +17,7 @@ class Item220(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "TA": None, #
-            # "TI": None, #
+            "TARGET_ADDRESS": None, #
         }
 
     @extract_octets
@@ -27,6 +26,5 @@ class Item220(DataItem):
         return self._bits_to_data(self.data.copy(), ADDRESS)
 
     def _bits_to_data(self, data, ADDRESS) -> dict[str, any]:
-        data["TA"] = f"{ADDRESS:06X}"
-        # data["TI"] = ADDRESS
+        data["TARGET_ADDRESS"] = f"{ADDRESS:06X}"
         return data

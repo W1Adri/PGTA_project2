@@ -17,24 +17,16 @@ class Item080(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "RAW_HEX": None,
             "TARGET_ADDRESS": None,
-            "TARGET_ADDRESS_HEX": None,
         }
 
     @extract_octets
     def decode(self, octets: bytes) -> dict[str, any]:
-        return self._bits_to_data(self.data.copy(), octets)
+        TARGET_ADDRESS = int.from_bytes(octets, byteorder="big", signed=False)
+        return self._bits_to_data(self.data.copy(), TARGET_ADDRESS)
 
-    def _bits_to_data(self, data, octets: bytes) -> dict[str, any]:
-        # Expect 3 octets representing a 24-bit target address (A23..A0)
-        data["RAW_HEX"] = octets.hex().upper()
-        if len(octets) >= 1:
-            # interpret up to 3 octets as big-endian integer
-            data["TARGET_ADDRESS"] = int.from_bytes(octets[:3], byteorder="big")
-            data["TARGET_ADDRESS_HEX"] = f"{data['TARGET_ADDRESS']:06X}"
+    def _bits_to_data(self, data, TARGET_ADDRESS) -> dict[str, any]:
 
-            # CSV alias: populate expected CSV column 'TA'
-            data["TA"] = data["TARGET_ADDRESS_HEX"]
+        data["TARGET_ADDRESS"] = f"{TARGET_ADDRESS:06X}"
 
         return data

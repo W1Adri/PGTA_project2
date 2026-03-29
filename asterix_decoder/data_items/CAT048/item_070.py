@@ -30,10 +30,10 @@ class Item070(DataItem):
         V = (value >> 15) & 0x1
         G = (value >> 14) & 0x1
         # L = (value >> 13) & 0x1
-        CODE_BITS = value & 0x0FFF
-        return self._bits_to_data(self.data.copy(), V, G, CODE_BITS)
+        MODE_3A = value & 0x0FFF
+        return self._bits_to_data(self.data.copy(), V, G, MODE_3A)
 
-    def _bits_to_data(self, data, V, G, CODE_BITS) -> dict[str, any]:
+    def _bits_to_data(self, data, V, G, MODE_3A) -> dict[str, any]:
         data["V_070"] = {
             0: "V", #Code validated
             1: "Not V", #Code not validated
@@ -49,9 +49,9 @@ class Item070(DataItem):
         #     1: "Mode-3/A code not extracted during the last scan",
         # }.get(L, None)
 
-        a = (CODE_BITS >> 9) & 0x7
-        b = (CODE_BITS >> 6) & 0x7
-        c = (CODE_BITS >> 3) & 0x7
-        d = CODE_BITS & 0x7
+        a = (MODE_3A >> 9) & 0x7
+        b = (MODE_3A >> 6) & 0x7
+        c = (MODE_3A >> 3) & 0x7
+        d = MODE_3A & 0x7
         data["MODE_3/A"] = f"{a}{b}{c}{d}"
         return data

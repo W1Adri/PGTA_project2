@@ -30,30 +30,19 @@ class Item170(DataItem):
 
     @extract_octets
     def decode(self, octets: bytes) -> dict[str, any]:
-        # Convert bytes to a 48-bit integer for bit extraction
-        value = int.from_bytes(octets, byteorder="big", signed=False)
-        return self._bits_to_data(self.data.copy(), value)
+        VALUE = int.from_bytes(octets, byteorder="big", signed=False)
+        return self._bits_to_data(self.data.copy(), VALUE)
 
     def _bits_to_data(self, data, VALUE: int) -> dict[str, any]:
-        # VALUE is a 48-bit integer built from the six octets (MSB-first)
-        data["RAW_HEX"] = VALUE.to_bytes(6, byteorder="big").hex().upper()
-        data["RAW_INT"] = int(VALUE)
-
         chars = []
-        # Extract eight 6-bit characters: bits 48..1, MSB = bit 48
         for shift in range(42, -1, -6):
             code = (VALUE >> shift) & 0x3F
             chars.append(self._decode_ia5_six_bit_char(code))
 
-        ti = "".join(chars).rstrip()
-
-        data["TI"] = ti
-        data["CHARS"] = chars
-
+        data["TARGET_IDENTIFICATION"] = "".join(chars).rstrip()
         return data
 
     def _decode_ia5_six_bit_char(self, value: int) -> str:
-        # IA-5 6-bit subset commonly used in ASTERIX for identification
         if value == 32:
             return " "
         if 1 <= value <= 26:

@@ -30,7 +30,7 @@ class Item090(DataItem):
         V = (value >> 15) & 0x1
         G = (value >> 14) & 0x1
         FL = value & 0x3FFF
-        
+                
         return self._bits_to_data(self.data.copy(), V, G, FL)
 
     def _bits_to_data(self, data, V, G, FL) -> dict[str, any]:
@@ -48,6 +48,7 @@ class Item090(DataItem):
         data["FL"] = fl_signed / 4.0
         data["H(ft)"] = int(data["FL"] * 100)  # Convert flight level to feet
         data["H(m)"] = round((data['H(ft)'] * 0.3048), 2)  # Convert feet to meters
+ 
         return data
     
     def _twos_complement(self, value: int, bits: int) -> int:

@@ -17,13 +17,16 @@ class Item040(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "RAW_HEX": None,
+            "GBS": None,
         }
 
     @extract_octets
     def decode(self, octets: bytes) -> dict[str, any]:
-        return self._bits_to_data(self.data.copy(), octets)
+        GBS = None
+        if len(octets) >= 1:
+            GBS = (octets[1] >> 6) & 0x1
+        return self._bits_to_data(self.data.copy(), GBS)
 
-    def _bits_to_data(self, data, octets: bytes) -> dict[str, any]:
-        data["RAW_HEX"] = octets.hex().upper()
+    def _bits_to_data(self, data, GBS = None) -> dict[str, any]:
+        data["GBS"] = GBS
         return data

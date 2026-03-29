@@ -17,7 +17,7 @@ class Item161(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "TN": None,
+            "TRACK_NUMBER": None,
         }
 
     @extract_octets
@@ -27,5 +27,5 @@ class Item161(DataItem):
         return self._bits_to_data(self.data.copy(), track_number)
 
     def _bits_to_data(self, data, track_number) -> dict[str, any]:
-        data["TN"] = track_number
+        data["TRACK_NUMBER"] = track_number
         return data

@@ -17,7 +17,7 @@ class Item240(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "TI": None,
+            "TARGET_IDENTIFICATION": None,
         }
 
     @extract_octets
@@ -31,7 +31,7 @@ class Item240(DataItem):
             code = (VALUE >> shift) & 0x3F
             chars.append(self._decode_ia5_six_bit_char(code))
 
-        data["TI"] = "".join(chars).rstrip()
+        data["TARGET_IDENTIFICATION"] = "".join(chars).rstrip()
         return data
 
         

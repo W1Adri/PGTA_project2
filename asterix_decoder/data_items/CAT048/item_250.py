@@ -26,23 +26,40 @@ class Item250(DataItem):
     def __init__(self, item_name: str, length_type):
         super().__init__(item_name, length_type)
         self.data = {
+            "MODE_S":                     None, # Summary string of decoded BDS registers
+            "MCP_STATUS":                 None, #
             "MCP_ALT":                    None, #
-            "FMS_ALT":                    None, # 
+            "FMS_STATUS":                 None, #
+            "FMS_ALT":                    None, #
+            "BP_STATUS":                  None, # 
             "BP":                         None, # Baro Pressure
+            "MODE_STATUS":                None, # General mode status (inferred from individual mode flags)
             "VNAV":                       None, # 
             "ALT_HOLD":                   None, #
             "APP":                        None, # Aproach mode
+            "TARGET_ALT_STATUS":          None, #
+            "TARGET_ALT_SOURCE":          None, #
+            "RA_STATUS":                   None, # Roll Angle status
             "RA":                         None, # Roll Angle
+            "TTA_STATUS":                  None, # True Track Angle status
             "TTA":                        None, # True Track Angle degree
+            "GS_STATUS":                   None, # Ground Speed status
             "GS":                         None, # Ground Speed kt
+            "TAR_STATUS":                  None, # Track Angle Rate status
             "TAR":                        None, # Track Angle Rate degree/s
+            "TAS_STATUS":                  None, # True Airspeed status
             "TAS":                         None, # True Airspeed kt
+            "HDG_STATUS":                  None, # Magnetic Heading status
             "HDG":                          None, # Magnetic Heading degree [-180 - 180]
+            "IAS_STATUS":                 None, # Indicated Airspeed status
             "IAS":                          None, # Indicated Airspeed kt
+            "MACH_STATUS":                 None, # Mach Number status
             "MACH":                         None, #
+            "MACH_NUMBER":                 None, # Mach Number
+            "BAR_STATUS":                  None, # Barometric Altitude Rate status
             "BAR":                          None, # Barometric Altitude Rate ft/min
+            "IVV_STATUS":                  None, # Inertial Vertical Velocity status
             "IVV":                          None, # Inertial Vertical Velocity ft/min
-            
         }
 
     @extract_octets
@@ -63,6 +80,7 @@ class Item250(DataItem):
     # ------------------------------------------------------------------
 
     def _bits_to_data(self, data, BLOCKS) -> dict[str, any]:
+        MODE_S = ""
         for BLOCK in BLOCKS:
             MB_DATA = BLOCK[:7]          # 56 bits of payload
             BDS_SELECTOR = BLOCK[7]
@@ -74,14 +92,17 @@ class Item250(DataItem):
                 continue
 
             if BDS_CODE == "4.0":
+                MODE_S += "BDS:4,0 "
                 block_info = self._decode_bds40(MB_DATA)
             elif BDS_CODE == "5.0":
+                MODE_S += "BDS:5,0 "
                 block_info = self._decode_bds50(MB_DATA)
             elif BDS_CODE == "6.0":
+                MODE_S += "BDS:6,0"
                 block_info = self._decode_bds60(MB_DATA)
 
             data.update(block_info)
-
+        data.update({"MODE_S": MODE_S})
         return data
 
     # ------------------------------------------------------------------
@@ -138,21 +159,28 @@ class Item250(DataItem):
         BARO_SETTING_MB = str(round(BARO_RAW * 0.1 + 800, 1)).replace(".", ",") if BARO_STATUS else None
 
         # ── Autopilot Mode Flags ───────────────────────────────────────
-        VNAV_MODE     = int(self._bit(BITS, 41))
-        ALT_HOLD_MODE = int(self._bit(BITS, 42))
-        APPROACH_MODE = int(self._bit(BITS, 43))
+        MODE_STATUS = int(self.bit(BITS, 48)) # No global "mode status" bit in BDS 4.0, but we can infer some info from the individual mode flags
+        VNAV_MODE     = int(self._bit(BITS, 49))
+        ALT_HOLD_MODE = int(self._bit(BITS, 50))
+        APPROACH_MODE = int(self._bit(BITS, 51))
 
         # ── Target Altitude Source ─────────────────────────────────────
         TARGET_ALT_SOURCE_STATUS = int(self._bit(BITS, 54))
+        TARGET_ALT_SOURCE_VALUE = self._bits_range(BITS, 55, 56)
 
         return {
+            "MCP_STATUS":                 MCP_STATUS,
             "MCP_ALT":                    MCP_ALTITUDE_FT,
+            "FMS_STATUS":                 FMS_STATUS,
             "FMS_ALT":                    FMS_ALTITUDE_FT,
+            "BP_STATUS":                  BARO_STATUS,
             "BP":                         BARO_SETTING_MB,
+            "MODE_STATUS":                MODE_STATUS, 
             "VNAV":                       VNAV_MODE,
             "ALT_HOLD":                   ALT_HOLD_MODE,
             "APP":                        APPROACH_MODE,
-            "TARGET_ALT_SOURCE":          TARGET_ALT_SOURCE_STATUS,
+            "TARGET_ALT_STATUS":          TARGET_ALT_SOURCE_STATUS,
+            "TARGET_ALT_SOURCE":          TARGET_ALT_SOURCE_VALUE,
         }
 
     # ------------------------------------------------------------------
@@ -205,10 +233,15 @@ class Item250(DataItem):
         TRUE_AIRSPEED_KT = str(TAS_RAW * 2).replace(".", ",") if TAS_STATUS else "NV"
 
         return {
+            "RA_STATUS":                   ROLL_STATUS,
             "RA":                         ROLL_ANGLE_DEG,
+            "TTA_STATUS":                  TTA_STATUS,
             "TTA":                        TRUE_TRACK_ANGLE_DEG,
+            "GS_STATUS":                   GS_STATUS,
             "GS":                         GROUND_SPEED_KT,
+            "TAR_STATUS":                  TAR_STATUS,
             "TAR":                        TRACK_ANGLE_RATE_DEG_S,
+            "TAS_STATUS":                  TAS_STATUS,
             "TAS":                        TRUE_AIRSPEED_KT,
         }
 
@@ -265,14 +298,18 @@ class Item250(DataItem):
         INERTIAL_VERT_VELOCITY_FPM = str(INERTIAL_VERT_VELOCITY_FPM).replace(".", ",") if IVV_STATUS else "NV"
 
         return {
+            "HDG_STATUS":                   MH_STATUS,
             "HDG":                          MAGNETIC_HEADING_DEG,
+            "IAS_STATUS":                  IAS_STATUS,
             "IAS":                          INDICATED_AIRSPEED_KT,
+            "MACH_STATUS":                 MACH_STATUS,
             "MACH":                         MACH_NUMBER,
+            "BAR_STATUS":                  BAR_STATUS,
             "BAR":                          BARO_ALT_RATE_FPM,
+            "IVV_STATUS":                  IVV_STATUS,
             "IVV":                          INERTIAL_VERT_VELOCITY_FPM,
         }
     
-
 
     def _twos_complement(self, value: int, bits: int) -> int:
         if value & (1 << (bits - 1)):
