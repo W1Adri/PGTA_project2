@@ -19,13 +19,7 @@ class Item170(DataItem):
     def __init__(self, item_name: str, length_str: str):
         super().__init__(item_name, length_str)
         self.data = {
-            "RAW_HEX": None,
-            # 48-bit raw integer representation of the 6 octets
-            "RAW_INT": None,
-            # Target Identification string (up to 8 chars)
-            "TI": None,
-            # Individual decoded characters as list
-            "CHARS": None,
+            "TARGET_IDENTIFICATION": None,
         }
 
     @extract_octets
