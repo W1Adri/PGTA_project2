@@ -2,7 +2,7 @@
  * map.js — always visible, centred on Barcelona by default.
  */
 
-const Map = (() => {
+const AppMap = (() => {
 
   let leaflet     = null;
   let initialized = false;
@@ -73,4 +73,4 @@ const Map = (() => {
 
 })();
 
-document.addEventListener("DOMContentLoaded", () => Map.setup());
+document.addEventListener("DOMContentLoaded", () => AppMap.setup());

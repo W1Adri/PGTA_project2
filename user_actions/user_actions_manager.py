@@ -60,7 +60,7 @@ class Actions:
         await self._send(websocket, {
             "type"  : "get_all_result",
             "status": "ok",
-            "data"  : {"records": records},
+            "data"  : {"records": records[:5000]},
         })
 
     async def action_apply_filters(
@@ -101,7 +101,7 @@ class Actions:
         await self._send(websocket, {
             "type"  : "apply_filters_result",
             "status": "ok",
-            "data"  : {"records": records, "count": len(records)},
+            "data"  : {"records": records[:5000], "count": len(records)},
         })
 
     async def action_get_metadata(

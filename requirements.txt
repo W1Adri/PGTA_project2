@@ -19,4 +19,4 @@ uvicorn
 websockets
 pywebview[qt]
 pyinstaller
-pythonnet  
+pythonnet; sys_platform == 'win32'

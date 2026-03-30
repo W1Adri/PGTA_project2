@@ -14,7 +14,9 @@
 
 const Upload = (() => {
 
-  const API_URL = "http://127.0.0.1:8000/upload";
+  const API_BASE = "http://127.0.0.1:8888";
+  const API_URL = `${API_BASE}/upload`;
+  const CSV_URL = `${API_BASE}/download/csv`;
 
   // ── Toast helper ─────────────────────────────────────────────────────────────
   function toast(message, type = "info") {
@@ -72,6 +74,10 @@ const Upload = (() => {
 
       setFileStatus(`${file.name}  (${(file.size / 1024).toFixed(0)} KB)`);
       toast(`Loaded ${meta.record_count?.toLocaleString() ?? "?"} records.`, "success");
+
+      // Enable download button
+      const dlBtn = document.getElementById("download-btn");
+      if (dlBtn) dlBtn.disabled = false;
 
       // Notify other modules
       window.dispatchEvent(new CustomEvent("asterix:loaded", { detail: meta }));
@@ -133,9 +139,43 @@ const Upload = (() => {
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────────
+  // ── Download CSV ─────────────────────────────────────────────────────────────
+  function initDownload() {
+    const button = document.getElementById("download-btn");
+    if (!button) return;
+
+    button.addEventListener("click", async () => {
+      toast("Downloading CSV…");
+      try {
+        if (window.pywebview && window.pywebview.api) {
+            const res = await window.pywebview.api.trigger_download_csv();
+            if (res === "Cancelled") {
+                toast("Download cancelled");
+            } else if (res.includes("successfully")) {
+                toast(res, "success");
+            } else {
+                toast(`Error: ${res}`, "error");
+            }
+        } else {
+            // Fallback for normal browsers (e.g. Chrome/Firefox)
+            const a = document.createElement("a");
+            a.href = CSV_URL;
+            a.download = "decoded_asterix.csv";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+      } catch (err) {
+          toast(err.message, "error");
+      }
+    });
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────────
   function init() {
     initDragDrop();
     initFileInput();
+    initDownload();
   }
 
   return { init, uploadFile };

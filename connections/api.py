@@ -1,9 +1,11 @@
+import io
 import uvicorn
-import os 
+import os
 import sys
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 
 from database.asterix_pandas import AsterixPandas
 from user_actions.user_actions_manager import Actions
@@ -45,19 +47,10 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
             raise HTTPException(status_code=400, detail="File is empty.")
 
         try:
-            # ── TODO: plug your ASTERIX decoder here ──────────────────────────
-            # Example using the `asterix` library (pip install asterix):
-            #
-            #   import asterix
-            #   decoded_records = asterix.parse(raw_bytes)
-            #   store.load(decoded_records)
-            #
-            # store.load() must clear old data and populate the DataFrame.
-            # See database/asterix_store.py for the expected schema.
-            # ─────────────────────────────────────────────────────────────────
+            from asterix_decoder.decoder_service import decode_asterix
 
-            # Placeholder — remove once decoder is integrated
-            store.load_raw_placeholder(raw_bytes)
+            df = decode_asterix(raw_bytes)
+            store.load_dataframe(df)
 
             return store.get_metadata()
 
@@ -65,6 +58,48 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
             import traceback
             traceback.print_exc()
             raise HTTPException(status_code=500, detail=f"Decode error: {exc}")
+
+    # ── CSV download ──────────────────────────────────────────────────────────
+    @api.get("/download/csv")
+    def download_csv():
+        """Return the current store data as a downloadable CSV file."""
+        if len(store) == 0:
+            raise HTTPException(status_code=404, detail="No data loaded yet.")
+
+        csv_bytes = store.to_csv_bytes()
+        return StreamingResponse(
+            io.BytesIO(csv_bytes),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=decoded_asterix.csv"
+            },
+        )
+
+    # ── Table Data (AG Grid) ──────────────────────────────────────────────────
+    @api.post("/table_data")
+    async def get_table_data(request: Request):
+        """Return paginated and optionally filtered data for the frontend data grid."""
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        start_row = body.get("startRow", 0)
+        end_row = body.get("endRow", 100)
+        sort_col = body.get("sortCol")
+        sort_dir = body.get("sortDir")
+        
+        # filters is what we pass to kwargs
+        filters = body.get("filters", {})
+
+        result = store.filter_paginated(
+            start_row=start_row,
+            end_row=end_row,
+            sort_col=sort_col,
+            sort_dir=sort_dir,
+            **filters
+        )
+        return result
 
     # ── Static frontend — MUST be last so API routes take priority ────────────
     api.mount("/", StaticFiles(directory=resource_path("ui"), html=True), name="ui")

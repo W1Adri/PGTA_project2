@@ -159,7 +159,7 @@ class Item250(DataItem):
         BARO_SETTING_MB = str(round(BARO_RAW * 0.1 + 800, 1)).replace(".", ",") if BARO_STATUS else None
 
         # ── Autopilot Mode Flags ───────────────────────────────────────
-        MODE_STATUS = int(self.bit(BITS, 48)) # No global "mode status" bit in BDS 4.0, but we can infer some info from the individual mode flags
+        MODE_STATUS = int(self._bit(BITS, 48)) # No global "mode status" bit in BDS 4.0, but we can infer some info from the individual mode flags
         VNAV_MODE     = int(self._bit(BITS, 49))
         ALT_HOLD_MODE = int(self._bit(BITS, 50))
         APPROACH_MODE = int(self._bit(BITS, 51))

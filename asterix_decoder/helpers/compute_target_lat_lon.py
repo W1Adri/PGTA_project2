@@ -26,12 +26,12 @@ REQUIRED_PRECISION = 1e-8
 # -----------------------------
 # Exact clone of GeoUtils.cs
 # -----------------------------
-def _calculate_earth_radius(self, lat_rad):
+def _calculate_earth_radius(lat_rad):
     # Radius of curvature in meridian
-    return (self.A * (1.0 - self.E2)) / ((1.0 - self.E2 * (math.sin(lat_rad) ** 2.0)) ** 1.5)
+    return (A * (1.0 - E2)) / ((1.0 - E2 * (math.sin(lat_rad) ** 2.0)) ** 1.5)
 
-def _calculate_elevation(self, center_height, R, rho_m, h_target):
-    if rho_m < self.ALMOST_ZERO:
+def _calculate_elevation(center_height, R, rho_m, h_target):
+    if rho_m < ALMOST_ZERO:
         return 0.0
 
     temp = (
@@ -46,7 +46,7 @@ def _calculate_elevation(self, center_height, R, rho_m, h_target):
     else:
         return math.pi / 2.0
 
-def _radar_spherical_to_radar_cartesian(self, rho_m, theta_rad, elevation_rad):
+def _radar_spherical_to_radar_cartesian(rho_m, theta_rad, elevation_rad):
     x = rho_m * math.cos(elevation_rad) * math.sin(theta_rad)
     y = rho_m * math.cos(elevation_rad) * math.cos(theta_rad)
     z = rho_m * math.sin(elevation_rad)
@@ -129,6 +129,6 @@ def compute_target_lat_lon(rho_nm, theta_deg, FL):
     elev = _calculate_elevation(H_RADAR, R, rho_m, h_target_m)
     x, y, z = _radar_spherical_to_radar_cartesian(rho_m, theta_rad, elev)
     X, Y, Z = _radar_cartesian_to_geocentric(lat_ref, lon_ref, H_RADAR, x, y, z)
-    lat_rad, lon_rad = _geocentric_to_geodesic(X, Y, Z)
+    lat_rad, lon_rad, _ = _geocentric_to_geodesic(X, Y, Z)
 
     return round(lat_rad * RAD2DEG, 8), round(lon_rad * RAD2DEG, 8) #, h_out, elev * RAD2DEG

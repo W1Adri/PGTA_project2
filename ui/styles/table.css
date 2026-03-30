@@ -60,70 +60,25 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* ── Table ───────────────────────────────────────────────────────────────── */
-#data-table {
+/* ── Table Container (AG Grid) ─────────────────────────────────────────────── */
+#myGrid {
+  /* AG Grid uses its own themes (ag-theme-quartz), 
+     we just ensure it fills the scroll container */
+  height: 100%;
   width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
 }
 
-#data-table thead { position: sticky; top: 0; z-index: 10; }
-
-#data-table th {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  text-align: left;
-  padding: 9px 13px;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border-light);
-  white-space: nowrap;
-  user-select: none;
-  cursor: pointer;
-  transition: background var(--transition), color var(--transition);
+/* Ensure empty/loading state text uses proper fonts */
+.ag-overlay-loading-center {
+  background: var(--bg-elevated) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-primary) !important;
+  border-radius: var(--radius);
+  font-family: var(--sans);
+  font-size: 13px;
+  box-shadow: var(--shadow-sm);
+  padding: 10px 20px;
 }
-
-#data-table th:last-child { border-right: none; }
-
-#data-table th:hover { background: var(--bg-hover); color: var(--text-primary); }
-
-#data-table th.sorted-asc::after  { content: ' ↑'; color: var(--accent); }
-#data-table th.sorted-desc::after { content: ' ↓'; color: var(--accent); }
-
-/* ── Rows ────────────────────────────────────────────────────────────────── */
-#data-table tbody tr {
-  border-bottom: 1px solid var(--border-light);
-  transition: background var(--transition);
-}
-
-#data-table tbody tr:hover    { background: var(--accent-light); }
-#data-table tbody tr.selected { background: var(--accent-light); }
-
-#data-table td {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--text-secondary);
-  padding: 7px 13px;
-  border-right: 1px solid var(--border-light);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-#data-table td:last-child { border-right: none; }
-
-/* Column-specific styles */
-#data-table td.col-callsign   { color: var(--text-primary); font-weight: 500; }
-#data-table td.col-altitude   { color: var(--accent); }
-#data-table td.col-squawk     { color: var(--green); }
-#data-table td.col-category   { color: var(--text-dim); font-size: 10px; }
-
-/* Alternating rows */
-#data-table tbody tr:nth-child(even) { background: var(--bg-elevated); }
-#data-table tbody tr:nth-child(even):hover { background: var(--accent-light); }
 
 /* ── Empty state ─────────────────────────────────────────────────────────── */
 .table-empty {
@@ -158,46 +113,4 @@
 
 .table-footer-text span { color: var(--accent); font-weight: 500; }
 
-/* ── Placeholder rows (shown before data loads) ──────────────────────────── */
-.placeholder-row td {
-  padding: 9px 13px;
-  pointer-events: none;
-}
-
-.placeholder-bar {
-  display: block;
-  height: 10px;
-  border-radius: 3px;
-  background: linear-gradient(90deg, var(--border-light) 25%, var(--bg-hover) 50%, var(--border-light) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.6s infinite;
-}
-
-/* Vary bar widths per column for a natural look */
-.placeholder-row td:nth-child(1) .placeholder-bar { width: 80%; }
-.placeholder-row td:nth-child(2) .placeholder-bar { width: 50%; }
-.placeholder-row td:nth-child(3) .placeholder-bar { width: 65%; }
-.placeholder-row td:nth-child(4) .placeholder-bar { width: 40%; }
-.placeholder-row td:nth-child(5) .placeholder-bar { width: 55%; }
-.placeholder-row td:nth-child(6) .placeholder-bar { width: 70%; }
-.placeholder-row td:nth-child(7) .placeholder-bar { width: 70%; }
-.placeholder-row td:nth-child(8) .placeholder-bar { width: 45%; }
-.placeholder-row td:nth-child(9) .placeholder-bar { width: 40%; }
-.placeholder-row td:nth-child(10) .placeholder-bar { width: 35%; }
-.placeholder-row td:nth-child(11) .placeholder-bar { width: 60%; }
-
-/* Stagger animation delay row by row */
-.placeholder-row:nth-child(2) .placeholder-bar { animation-delay: 0.1s; }
-.placeholder-row:nth-child(3) .placeholder-bar { animation-delay: 0.2s; }
-.placeholder-row:nth-child(4) .placeholder-bar { animation-delay: 0.3s; }
-.placeholder-row:nth-child(5) .placeholder-bar { animation-delay: 0.4s; }
-.placeholder-row:nth-child(6) .placeholder-bar { animation-delay: 0.5s; }
-.placeholder-row:nth-child(7) .placeholder-bar { animation-delay: 0.1s; }
-.placeholder-row:nth-child(8) .placeholder-bar { animation-delay: 0.2s; }
-.placeholder-row:nth-child(9) .placeholder-bar { animation-delay: 0.3s; }
-.placeholder-row:nth-child(10) .placeholder-bar { animation-delay: 0.4s; }
-
-@keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
+/* (Removed old placeholder-bar css) */

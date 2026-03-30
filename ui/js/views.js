@@ -19,7 +19,7 @@ const Views = (() => {
     document.querySelectorAll(".view-btn").forEach(b =>
       b.classList.toggle("active", b.dataset.view === view));
 
-    if (view === "map") Map.onPanelVisible();
+    if (view === "map") AppMap.onPanelVisible();
   }
 
   function init() {
@@ -33,7 +33,7 @@ const Views = (() => {
     });
 
     // Map is the default — init immediately
-    Map.init();
+    AppMap.init();
   }
 
   return { init, switchTo, current: () => current };

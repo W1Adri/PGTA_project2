@@ -8,6 +8,9 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+  <!-- AG Grid -->
+  <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+
   <link rel="stylesheet" href="styles/interface.css">
   <link rel="stylesheet" href="styles/filters.css">
   <link rel="stylesheet" href="styles/map.css">
@@ -33,6 +36,7 @@
     <div class="header-actions">
       <span class="record-badge">Records:&nbsp;<span class="count" id="record-count">—</span></span>
       <button class="upload-btn" id="upload-btn">Load File</button>
+      <button class="download-btn" id="download-btn" disabled>Download CSV</button>
     </div>
 
     <input type="file" id="file-input" accept=".ast,.bin,application/octet-stream">
@@ -164,11 +168,8 @@
 
       <!-- empty state removed — table is always visible -->
 
-      <div class="table-scroll" style="display:none;">
-        <table id="data-table">
-          <thead><tr></tr></thead>
-          <tbody></tbody>
-        </table>
+      <div class="table-scroll" style="display:none; height: 100%; min-height: 400px;">
+        <div id="myGrid" class="ag-theme-quartz" style="height: 100%; width: 100%;"></div>
       </div>
 
       <div class="table-footer">

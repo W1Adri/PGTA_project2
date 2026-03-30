@@ -1,103 +1,109 @@
 /**
- * table.js — always shows the table structure with placeholder rows until data loads.
+ * table.js — AG Grid integration for server-side pagination (Infinite Row Model).
  */
 
 const Table = (() => {
 
-  let allRows = [];
+  let gridApi = null;
+  const API_URL = "http://127.0.0.1:8888/table_data";
 
-  const COLUMNS = [
-    { key: "timestamp",    label: "Timestamp",  cls: "" },
-    { key: "track_number", label: "Track #",    cls: "" },
-    { key: "callsign",     label: "Callsign",   cls: "col-callsign" },
-    { key: "squawk",       label: "Squawk",     cls: "col-squawk" },
-    { key: "category",     label: "Category",   cls: "col-category" },
-    { key: "latitude",     label: "Lat",        cls: "" },
-    { key: "longitude",    label: "Lon",        cls: "" },
-    { key: "altitude_ft",  label: "Alt (ft)",   cls: "col-altitude" },
-    { key: "ground_speed", label: "GS (kts)",   cls: "" },
-    { key: "heading",      label: "HDG",        cls: "" },
-    { key: "data_source",  label: "Source",     cls: "" },
-  ];
+  // ── AG Grid Datasource ──────────────────────────────────────────────────
+  const datasource = {
+    getRows: async (params) => {
+      // Show loading overlay
+      if (gridApi) gridApi.showLoadingOverlay();
 
-  const PLACEHOLDER_ROWS = 10;
+      try {
+        // Get active filters from sidebar
+        const filters = typeof Filters !== "undefined" ? Filters.getActive() : {};
 
-  // ── Header ────────────────────────────────────────────────────────────────
-  function buildHeader() {
-    const tr = document.querySelector("#data-table thead tr");
-    if (!tr) return;
-    tr.innerHTML = COLUMNS.map(c =>
-      `<th data-key="${c.key}">${c.label}</th>`
-    ).join("");
-  }
+        // Extract sort info if available
+        let sortCol = null;
+        let sortDir = null;
+        if (params.sortModel && params.sortModel.length > 0) {
+           sortCol = params.sortModel[0].colId;
+           sortDir = params.sortModel[0].sort;
+        }
 
-  // ── Placeholder rows ──────────────────────────────────────────────────────
-  function buildPlaceholderRows() {
-    const tbody = document.querySelector("#data-table tbody");
-    if (!tbody) return;
-    tbody.innerHTML = "";
+        const requestBody = {
+          startRow: params.startRow,
+          endRow: params.endRow,
+          sortCol: sortCol,
+          sortDir: sortDir,
+          filters: filters
+        };
 
-    for (let i = 0; i < PLACEHOLDER_ROWS; i++) {
-      const tr = document.createElement("tr");
-      tr.classList.add("placeholder-row");
-      COLUMNS.forEach(() => {
-        const td = document.createElement("td");
-        const bar = document.createElement("span");
-        bar.className = "placeholder-bar";
-        td.appendChild(bar);
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) {
+          throw new Error("Network response was not ok");
+        }
+
+        const data = await response.json();
+        
+        // Hide loading
+        if (gridApi) gridApi.hideOverlay();
+
+        // Pass results to AG Grid
+        params.successCallback(data.records || [], data.count);
+
+        // Update custom footer
+        updateFooter(data.count, false);
+
+      } catch (error) {
+        console.error("Error fetching paginated data:", error);
+        if (gridApi) gridApi.hideOverlay();
+        params.failCallback();
+      }
+    }
+  };
+
+  // ── Initialization ────────────────────────────────────────────────────────
+  function initGrid(columns = []) {
+    const gridDiv = document.querySelector('#myGrid');
+    if (!gridDiv) return;
+
+    gridDiv.innerHTML = ""; // Clear existing grid if any
+    
+    // Map data columns to AG Grid format
+    const columnDefs = columns.map(col => ({
+      field: col,
+      headerName: col,
+      sortable: true,
+      filter: false, // We use sidebar filtering
+      minWidth: 120,
+      resizable: true,
+      valueFormatter: (params) => {
+          return (params.value === null || params.value === undefined) ? "—" : params.value;
+      }
+    }));
+
+    // If no columns, show placeholder
+    if (columnDefs.length === 0) {
+      columnDefs.push({ headerName: "No Data", field: "empty" });
     }
 
-    updateFooter(0, true);
-  }
-
-  // ── Render records ────────────────────────────────────────────────────────
-  function renderRecords(records) {
-    // TODO: implement after data integration
-    // allRows = records;
-    // const tbody = document.querySelector("#data-table tbody");
-    // tbody.innerHTML = "";
-    // records.forEach(r => {
-    //   const tr = document.createElement("tr");
-    //   COLUMNS.forEach(col => {
-    //     const td = document.createElement("td");
-    //     td.className   = col.cls;
-    //     td.textContent = formatCell(col.key, r[col.key]);
-    //     tr.appendChild(td);
-    //   });
-    //   tbody.appendChild(tr);
-    // });
-    // updateFooter(records.length, false);
-    console.log(`[Table] renderRecords — ${records.length} records (not yet implemented)`);
-  }
-
-  function clearRows() {
-    document.querySelector("#data-table tbody").innerHTML = "";
-    allRows = [];
-  }
-
-  // ── Quick search ──────────────────────────────────────────────────────────
-  function initQuickSearch() {
-    const input = document.getElementById("table-search");
-    if (!input) return;
-    input.addEventListener("input", () => {
-      const q    = input.value.trim().toLowerCase();
-      const rows = document.querySelectorAll("#data-table tbody tr:not(.placeholder-row)");
-      let vis = 0;
-      rows.forEach(row => {
-        const show = !q || row.textContent.toLowerCase().includes(q);
-        row.style.display = show ? "" : "none";
-        if (show) vis++;
-      });
-      const foot = document.getElementById("table-row-count");
-      if (foot && allRows.length) {
-        foot.innerHTML = q
-          ? `Showing <span>${vis.toLocaleString()}</span> of <span>${allRows.length.toLocaleString()}</span> records`
-          : `<span>${allRows.length.toLocaleString()}</span> records`;
+    const gridOptions = {
+      columnDefs: columnDefs,
+      rowModelType: 'infinite',
+      cacheBlockSize: 100, // Fetch 100 rows at a time
+      maxBlocksInCache: 10,  // Keep up to 1000 rows in DOM
+      datasource: datasource,
+      rowSelection: 'single',
+      overlayLoadingTemplate: '<span class="ag-overlay-loading-center">Cargando datos...</span>',
+      overlayNoRowsTemplate: '<span class="ag-overlay-loading-center">Sin resultados</span>',
+      defaultColDef: {
+        flex: 1, // Automatically expand columns to fit width
+        minWidth: 100
       }
-    });
+    };
+
+    gridApi = agGrid.createGrid(gridDiv, gridOptions);
+    updateFooter(0, true);
   }
 
   // ── Footer ────────────────────────────────────────────────────────────────
@@ -106,34 +112,55 @@ const Table = (() => {
     if (!el) return;
     el.innerHTML = isPlaceholder
       ? `<span style="color:var(--text-dim)">Load a file to populate the table</span>`
-      : `<span>${n.toLocaleString()}</span> records`;
+      : `<span>${(n || 0).toLocaleString()}</span> filtered records`;
   }
 
-  // ── WS handlers ───────────────────────────────────────────────────────────
-  function onFilterResult(payload) {
-    if (payload.status !== "ok") return;
-    renderRecords(payload.data?.records ?? []);
+  // ── Actions ───────────────────────────────────────────────────────────────
+  
+  function refreshGrid() {
+    if (gridApi) {
+      gridApi.purgeInfiniteCache(); // Forces datasource.getRows to trigger again
+    }
+  }
+
+  // ── Event Handlers ────────────────────────────────────────────────────────
+  
+  // When file is uploaded and metadata is available, we setup columns and grid
+  function onDataLoaded(meta) {
+      const columns = meta.columns || [];
+      if (gridApi) {
+          gridApi.destroy();
+      }
+      initGrid(columns);
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
   function init() {
-    buildHeader();
-    buildPlaceholderRows();
-    initQuickSearch();
+    initGrid([]); // Start with empty placeholder Grid
 
-    // Always show the table — hide the empty state div
+    // Always show the table wrapper — hide the empty state div if it existed
     const empty  = document.getElementById("table-empty");
     const scroll = document.querySelector(".table-scroll");
     if (empty)  empty.style.display  = "none";
     if (scroll) scroll.style.display = "block";
 
-    WS.on("apply_filters_result", onFilterResult);
-    WS.on("get_all_result",       onFilterResult);
+    // 1. Listen for initial file load to discover columns
+    window.addEventListener("asterix:loaded", (e) => onDataLoaded(e.detail));
 
-    window.addEventListener("asterix:loaded", () => updateFooter(0, false));
+    // 2. Listen for "apply_filters" button to trigger refresh
+    const applyBtn = document.getElementById("btn-apply-filters");
+    if (applyBtn) {
+        applyBtn.addEventListener("click", () => {
+            // Wait slightly for standard Filters logic to update states if needed
+            setTimeout(refreshGrid, 50); 
+        });
+    }
+
+    // 3. WS fallback if WS pushes "apply_filters_result" (optional, but good for map sync)
+    // WS.on("apply_filters_result", refreshGrid);
   }
 
-  return { init, renderRecords, clearRows };
+  return { init, refreshGrid };
 
 })();
 

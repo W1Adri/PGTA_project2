@@ -177,6 +177,30 @@ html, body {
 }
 
 .upload-btn:hover { background: var(--accent-hover); }
+
+.download-btn {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 14px;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.download-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.download-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 #file-input { display: none; }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
