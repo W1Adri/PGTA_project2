@@ -1,64 +1,167 @@
 /**
- * table.js — AG Grid integration for server-side pagination (Infinite Row Model).
+ * table.js — AG Grid integration using websocket windowed streaming.
  */
 
 const Table = (() => {
 
   let gridApi = null;
-  const API_URL = "http://127.0.0.1:8888/table_data";
+  let cacheGeneration = 0;
+  let requestSeq = 0;
+  let lastKnownTotalCount = 0;
+  let hasDatasetLoaded = false;
+  let isProcessing = false;
+  let pendingRequests = new Map();
+  let rowCache = new Map(); // absolute_row_index -> row data
+
+  const BLOCK_SIZE = 100;
+  const WINDOW_MARGIN = 400;
+  const RETAIN_MARGIN = 1000;
+
+  function nextRequestId() {
+    requestSeq += 1;
+    return `table_${cacheGeneration}_${requestSeq}`;
+  }
+
+  function clearCache() {
+    rowCache.clear();
+    pendingRequests.clear();
+    lastKnownTotalCount = 0;
+    cacheGeneration += 1;
+  }
+
+  function hasCachedRange(startRow, endRow) {
+    for (let i = startRow; i < endRow; i += 1) {
+      if (!rowCache.has(i)) return false;
+    }
+    return true;
+  }
+
+  function buildRowsFromCache(startRow, endRow) {
+    const rows = [];
+    for (let i = startRow; i < endRow; i += 1) {
+      rows.push(rowCache.get(i) || null);
+    }
+    return rows;
+  }
+
+  function pruneCache(keepStart, keepEnd) {
+    const minKeep = Math.max(0, keepStart - RETAIN_MARGIN);
+    const maxKeep = keepEnd + RETAIN_MARGIN;
+
+    for (const idx of rowCache.keys()) {
+      if (idx < minKeep || idx >= maxKeep) {
+        rowCache.delete(idx);
+      }
+    }
+  }
+
+  function getSortFromParams(params) {
+    if (params.sortModel && params.sortModel.length > 0) {
+      return {
+        sortCol: params.sortModel[0].colId,
+        sortDir: params.sortModel[0].sort,
+      };
+    }
+    return { sortCol: null, sortDir: null };
+  }
+
+  function requestWindow(params) {
+    const startRow = params.startRow;
+    const endRow = params.endRow;
+    const filters = typeof Filters !== "undefined" ? Filters.getActive() : {};
+    const { sortCol, sortDir } = getSortFromParams(params);
+    const requestId = nextRequestId();
+
+    pendingRequests.set(requestId, {
+      generation: cacheGeneration,
+      startRow,
+      endRow,
+      successCallback: params.successCallback,
+      failCallback: params.failCallback,
+    });
+
+    const sent = WS.send({
+      action: "get_table_window",
+      request_id: requestId,
+      startRow,
+      endRow,
+      margin: WINDOW_MARGIN,
+      sortCol,
+      sortDir,
+      filters,
+    });
+
+    if (!sent) {
+      pendingRequests.delete(requestId);
+      params.failCallback();
+      if (gridApi) gridApi.setGridOption("loading", false);
+    }
+  }
+
+  function onTableWindow(payload) {
+    const data = payload?.data || {};
+    const requestId = data.request_id;
+    if (!requestId || !pendingRequests.has(requestId)) return;
+
+    const pending = pendingRequests.get(requestId);
+    pendingRequests.delete(requestId);
+
+    if (pending.generation !== cacheGeneration) return;
+
+    const windowStart = data.window_start || 0;
+    const records = data.records || [];
+    const totalCount = data.total_count || 0;
+    lastKnownTotalCount = totalCount;
+
+    if (totalCount === 0) {
+      pending.successCallback([], 0);
+      updateFooter(0, false);
+      if (gridApi) gridApi.setGridOption("loading", false);
+      return;
+    }
+
+    records.forEach((row, offset) => {
+      rowCache.set(windowStart + offset, row);
+    });
+
+    pruneCache(pending.startRow, pending.endRow);
+
+    if (!hasCachedRange(pending.startRow, pending.endRow)) {
+      pending.failCallback();
+      if (gridApi) gridApi.setGridOption("loading", false);
+      return;
+    }
+
+    const rows = buildRowsFromCache(pending.startRow, pending.endRow);
+    pending.successCallback(rows, totalCount);
+
+    updateFooter(totalCount, false);
+    if (gridApi) gridApi.setGridOption("loading", false);
+  }
 
   // ── AG Grid Datasource ──────────────────────────────────────────────────
   const datasource = {
-    getRows: async (params) => {
-      // Show loading overlay
-      if (gridApi) gridApi.showLoadingOverlay();
-
-      try {
-        // Get active filters from sidebar
-        const filters = typeof Filters !== "undefined" ? Filters.getActive() : {};
-
-        // Extract sort info if available
-        let sortCol = null;
-        let sortDir = null;
-        if (params.sortModel && params.sortModel.length > 0) {
-           sortCol = params.sortModel[0].colId;
-           sortDir = params.sortModel[0].sort;
+    getRows: (params) => {
+      if (!hasDatasetLoaded) {
+        params.successCallback([], 0);
+        if (gridApi) {
+          gridApi.setGridOption("loading", false);
+          updateFooter(0, true);
+          gridApi.showNoRowsOverlay();
         }
-
-        const requestBody = {
-          startRow: params.startRow,
-          endRow: params.endRow,
-          sortCol: sortCol,
-          sortDir: sortDir,
-          filters: filters
-        };
-
-        const response = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-          throw new Error("Network response was not ok");
-        }
-
-        const data = await response.json();
-        
-        // Hide loading
-        if (gridApi) gridApi.hideOverlay();
-
-        // Pass results to AG Grid
-        params.successCallback(data.records || [], data.count);
-
-        // Update custom footer
-        updateFooter(data.count, false);
-
-      } catch (error) {
-        console.error("Error fetching paginated data:", error);
-        if (gridApi) gridApi.hideOverlay();
-        params.failCallback();
+        return;
       }
+
+      if (gridApi) gridApi.setGridOption("loading", true);
+
+      if (hasCachedRange(params.startRow, params.endRow)) {
+        const rows = buildRowsFromCache(params.startRow, params.endRow);
+        params.successCallback(rows, lastKnownTotalCount);
+        if (gridApi) gridApi.setGridOption("loading", false);
+        return;
+      }
+
+      requestWindow(params);
     }
   };
 
@@ -90,12 +193,13 @@ const Table = (() => {
     const gridOptions = {
       columnDefs: columnDefs,
       rowModelType: 'infinite',
-      cacheBlockSize: 100, // Fetch 100 rows at a time
-      maxBlocksInCache: 10,  // Keep up to 1000 rows in DOM
+      cacheBlockSize: BLOCK_SIZE,
+      maxBlocksInCache: 10,
       datasource: datasource,
-      rowSelection: 'single',
-      overlayLoadingTemplate: '<span class="ag-overlay-loading-center">Cargando datos...</span>',
-      overlayNoRowsTemplate: '<span class="ag-overlay-loading-center">Sin resultados</span>',
+      rowSelection: { mode: 'singleRow' },
+      loading: false,
+      overlayLoadingTemplate: '<span class="ag-overlay-loading-center">Loading messages...</span>',
+      overlayNoRowsTemplate: '<span class="ag-overlay-loading-center">No messages to display</span>',
       defaultColDef: {
         flex: 1, // Automatically expand columns to fit width
         minWidth: 100
@@ -110,17 +214,25 @@ const Table = (() => {
   function updateFooter(n, isPlaceholder = false) {
     const el = document.getElementById("table-row-count");
     if (!el) return;
+
+    if (isPlaceholder) {
+      const message = isProcessing
+        ? "Processing uploaded file... messages will appear soon"
+        : "No file uploaded yet. Upload a file to display messages";
+      el.innerHTML = `<span style="color:var(--text-dim)">${message}</span>`;
+      return;
+    }
+
     el.innerHTML = isPlaceholder
-      ? `<span style="color:var(--text-dim)">Load a file to populate the table</span>`
-      : `<span>${(n || 0).toLocaleString()}</span> filtered records`;
+      ? `<span style="color:var(--text-dim)">No file uploaded yet. Upload a file to display messages</span>`
+      : `<span>${(n || 0).toLocaleString()}</span> filtered messages`;
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
   
   function refreshGrid() {
-    if (gridApi) {
-      gridApi.purgeInfiniteCache(); // Forces datasource.getRows to trigger again
-    }
+    clearCache();
+    if (gridApi) gridApi.purgeInfiniteCache();
   }
 
   // ── Event Handlers ────────────────────────────────────────────────────────
@@ -128,15 +240,44 @@ const Table = (() => {
   // When file is uploaded and metadata is available, we setup columns and grid
   function onDataLoaded(meta) {
       const columns = meta.columns || [];
+      isProcessing = false;
+      hasDatasetLoaded = true;
+      clearCache();
       if (gridApi) {
           gridApi.destroy();
       }
       initGrid(columns);
+      refreshGrid();
+  }
+
+  function onProcessingStart() {
+    isProcessing = true;
+    hasDatasetLoaded = false;
+    clearCache();
+    if (gridApi) {
+      gridApi.setGridOption("loading", true);
+      updateFooter(0, true);
+    }
+  }
+
+  function onProcessingEnd(evt) {
+    const ok = !!evt?.detail?.success;
+    isProcessing = false;
+    if (!ok) {
+      hasDatasetLoaded = false;
+      clearCache();
+      if (gridApi) {
+        gridApi.setGridOption("loading", false);
+        updateFooter(0, true);
+        gridApi.showNoRowsOverlay();
+      }
+    }
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
   function init() {
     initGrid([]); // Start with empty placeholder Grid
+    hasDatasetLoaded = false;
 
     // Always show the table wrapper — hide the empty state div if it existed
     const empty  = document.getElementById("table-empty");
@@ -146,6 +287,8 @@ const Table = (() => {
 
     // 1. Listen for initial file load to discover columns
     window.addEventListener("asterix:loaded", (e) => onDataLoaded(e.detail));
+    window.addEventListener("asterix:processing-start", onProcessingStart);
+    window.addEventListener("asterix:processing-end", onProcessingEnd);
 
     // 2. Listen for "apply_filters" button to trigger refresh
     const applyBtn = document.getElementById("btn-apply-filters");
@@ -158,6 +301,16 @@ const Table = (() => {
 
     // 3. WS fallback if WS pushes "apply_filters_result" (optional, but good for map sync)
     // WS.on("apply_filters_result", refreshGrid);
+
+    // 4. Main table stream channel
+    WS.on("table_window_result", onTableWindow);
+
+    // Keep initial table state clean while no file exists.
+    if (gridApi) {
+      gridApi.setGridOption("loading", false);
+      updateFooter(0, true);
+      gridApi.showNoRowsOverlay();
+    }
   }
 
   return { init, refreshGrid };

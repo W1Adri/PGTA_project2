@@ -49,6 +49,8 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
         try:
             from asterix_decoder.decoder_service import decode_asterix
 
+            # Always start from a clean in-memory dataset per upload session.
+            store.clear()
             df = decode_asterix(raw_bytes)
             store.load_dataframe(df)
 

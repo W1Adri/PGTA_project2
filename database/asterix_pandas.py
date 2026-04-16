@@ -8,13 +8,10 @@ produces (e.g. CAT, SAC, SIC, TIME, LAT, LON, FL, TARGET_IDENTIFICATION …).
 """
 
 import io
-import os
 import threading
 from typing import Any
 
 import pandas as pd
-
-DB_FILE = os.path.join(os.path.dirname(__file__), "decoded_data.pkl")
 
 class AsterixPandas:
     """Thread-safe in-memory store for a decoded ASTERIX session."""
@@ -22,29 +19,6 @@ class AsterixPandas:
     def __init__(self):
         self._lock = threading.RLock()
         self._df: pd.DataFrame = pd.DataFrame()
-        self._load_from_disk()
-
-    def _load_from_disk(self) -> None:
-        try:
-            if os.path.exists(DB_FILE):
-                self._df = pd.read_pickle(DB_FILE)
-                print(f"[Store] Initialized from disk: {len(self._df):,} records.")
-            else:
-                self._df = pd.DataFrame()
-        except Exception as e:
-            print(f"[Store] Failed to load from disk: {e}")
-            self._df = pd.DataFrame()
-
-    def _save_to_disk(self) -> None:
-        try:
-            if not self._df.empty:
-                self._df.to_pickle(DB_FILE)
-                print(f"[Store] Saved {len(self._df):,} records to disk.")
-            else:
-                if os.path.exists(DB_FILE):
-                    os.remove(DB_FILE)
-        except Exception as e:
-            print(f"[Store] Failed to save to disk: {e}")
 
     # ── Loading ───────────────────────────────────────────────────────────────
 
@@ -59,7 +33,6 @@ class AsterixPandas:
         """
         with self._lock:
             self._df = df.reset_index(drop=True)
-            self._save_to_disk()
         print(f"[Store] Loaded {len(self._df):,} records  ({len(self._df.columns)} columns).")
 
     # ── Querying ──────────────────────────────────────────────────────────────
@@ -167,6 +140,54 @@ class AsterixPandas:
                 "count": total_count
             }
 
+    def get_table_window(
+        self,
+        start_row: int,
+        end_row: int,
+        *,
+        margin: int = 400,
+        sort_col: str | None = None,
+        sort_dir: str | None = None,
+        **kwargs,
+    ) -> dict[str, Any]:
+        """
+        Return a window around a requested visible range.
+
+        The returned records are contiguous in the filtered/sorted index space,
+        and include extra rows on both sides to reduce round-trips while scrolling.
+        """
+        with self._lock:
+            df = self._apply_filters(**kwargs)
+            total_count = len(df)
+            if total_count == 0:
+                return {
+                    "records": [],
+                    "total_count": 0,
+                    "window_start": 0,
+                    "window_end": 0,
+                }
+
+            if sort_col and sort_col in df.columns:
+                ascending = (sort_dir != "desc")
+                df = df.sort_values(by=sort_col, ascending=ascending)
+
+            safe_start = max(0, min(int(start_row), total_count))
+            safe_end = max(safe_start, min(int(end_row), total_count))
+            safe_margin = max(0, int(margin))
+
+            window_start = max(0, safe_start - safe_margin)
+            window_end = min(total_count, safe_end + safe_margin)
+
+            sliced_df = df.iloc[window_start:window_end]
+            records = sliced_df.astype(object).where(pd.notna(sliced_df), None).to_dict(orient="records")
+
+            return {
+                "records": records,
+                "total_count": total_count,
+                "window_start": window_start,
+                "window_end": window_end,
+            }
+
     def get_all(self) -> list[dict]:
         """Return every record (no filters)."""
         with self._lock:
@@ -267,7 +288,6 @@ class AsterixPandas:
     def clear(self) -> None:
         with self._lock:
             self._df = pd.DataFrame()
-            self._save_to_disk()
             print("[Store] Cleared.")
 
     def __len__(self) -> int:

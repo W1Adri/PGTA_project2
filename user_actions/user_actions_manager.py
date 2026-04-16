@@ -31,6 +31,9 @@ class Actions:
         elif action == "clear_data":
             await self.action_clear_data(websocket, data)
 
+        elif action == "get_table_window":
+            await self.action_get_table_window(websocket, data)
+
         # ── TODO: register new actions here ──────────────────────────────────
         # elif action == "your_new_action":
         #     await self.action_your_new_action(websocket, data)
@@ -140,6 +143,68 @@ class Actions:
             "type"  : "clear_data_result",
             "status": "ok",
             "data"  : {"detail": "Store cleared."},
+        })
+
+    async def action_get_table_window(
+        self,
+        websocket: WebSocketServerProtocol,
+        data: dict,
+    ) -> None:
+        """
+        Return a contiguous table window around the currently visible indices.
+
+        Request:
+          {
+            "action": "get_table_window",
+            "startRow": 1200,
+            "endRow": 1300,
+            "margin": 400,
+            "sortCol": "TIME",          // optional
+            "sortDir": "asc|desc",      // optional
+            "filters": {...},             // optional
+            "request_id": "uuid-like"   // optional client correlation id
+          }
+
+        Response:
+          {
+            "type": "table_window_result",
+            "status": "ok",
+            "data": {
+              "request_id": "...",
+              "window_start": 800,
+              "window_end": 1700,
+              "total_count": 52340,
+              "records": [...]
+            }
+          }
+        """
+        start_row = int(data.get("startRow", 0))
+        end_row = int(data.get("endRow", start_row + 100))
+        margin = int(data.get("margin", 400))
+        sort_col = data.get("sortCol")
+        sort_dir = data.get("sortDir")
+        request_id = data.get("request_id")
+
+        raw_filters = data.get("filters") or {}
+        if not isinstance(raw_filters, dict):
+            raw_filters = {}
+
+        result = self.store.get_table_window(
+            start_row=start_row,
+            end_row=end_row,
+            margin=margin,
+            sort_col=sort_col,
+            sort_dir=sort_dir,
+            **raw_filters,
+        )
+
+        await self._send(websocket, {
+            "type": "table_window_result",
+            "status": "ok",
+            "data": {
+                "request_id": request_id,
+                **result,
+            },
         })
 
     # ── TODO: add new action handlers below ──────────────────────────────────

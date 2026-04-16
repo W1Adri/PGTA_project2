@@ -38,7 +38,12 @@ const Upload = (() => {
   // ── Status bar file info ──────────────────────────────────────────────────────
   function setFileStatus(filename) {
     const el = document.getElementById("file-label");
-    if (el) el.textContent = filename ?? "No file loaded";
+    if (el) el.textContent = filename ?? "No file uploaded yet";
+  }
+
+  function setMessageBadge(value) {
+    const badge = document.getElementById("record-count");
+    if (badge) badge.textContent = value;
   }
 
   // ── Upload logic ──────────────────────────────────────────────────────────────
@@ -52,8 +57,13 @@ const Upload = (() => {
       return;
     }
 
-    toast(`Loading: ${file.name}`);
-    setFileStatus(`${file.name} — uploading...`);
+    toast(`Processing file: ${file.name}`);
+    setFileStatus(`Processing file... ${file.name}`);
+    setMessageBadge("Processing...");
+
+    window.dispatchEvent(new CustomEvent("asterix:processing-start", {
+      detail: { filename: file.name }
+    }));
 
     const form = new FormData();
     form.append("file", file);
@@ -68,12 +78,11 @@ const Upload = (() => {
 
       const meta = await res.json();
 
-      // Update record badge in header
-      const badge = document.getElementById("record-count");
-      if (badge) badge.textContent = meta.record_count?.toLocaleString() ?? "0";
+      // Update message badge in header
+      setMessageBadge(meta.record_count?.toLocaleString() ?? "0");
 
       setFileStatus(`${file.name}  (${(file.size / 1024).toFixed(0)} KB)`);
-      toast(`Loaded ${meta.record_count?.toLocaleString() ?? "?"} records.`, "success");
+      toast(`Loaded ${meta.record_count?.toLocaleString() ?? "?"} messages.`, "success");
 
       // Enable download button
       const dlBtn = document.getElementById("download-btn");
@@ -81,11 +90,18 @@ const Upload = (() => {
 
       // Notify other modules
       window.dispatchEvent(new CustomEvent("asterix:loaded", { detail: meta }));
+      window.dispatchEvent(new CustomEvent("asterix:processing-end", {
+        detail: { success: true, metadata: meta }
+      }));
 
     } catch (err) {
       console.error("[Upload] Error:", err);
       toast(`Error: ${err.message}`, "error");
       setFileStatus("Upload failed.");
+      setMessageBadge("—");
+      window.dispatchEvent(new CustomEvent("asterix:processing-end", {
+        detail: { success: false, error: String(err?.message || err) }
+      }));
     }
   }
 
@@ -176,6 +192,8 @@ const Upload = (() => {
     initDragDrop();
     initFileInput();
     initDownload();
+    setFileStatus(null);
+    setMessageBadge("—");
   }
 
   return { init, uploadFile };
