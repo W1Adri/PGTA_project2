@@ -48,6 +48,68 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
+#frontpage {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 14% 12%, rgba(26, 86, 168, 0.16), transparent 44%),
+    radial-gradient(circle at 88% 20%, rgba(16, 185, 129, 0.12), transparent 36%),
+    linear-gradient(165deg, #f8fbff 0%, #eef3f9 50%, #e8eef6 100%);
+}
+
+.frontpage-card {
+  width: min(680px, 100%);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 20px 36px rgba(17, 24, 39, 0.14);
+  padding: 34px 28px;
+  text-align: center;
+}
+
+.frontpage-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 18px;
+}
+
+.frontpage-title {
+  font-family: var(--mono);
+  font-size: 24px;
+  line-height: 1.25;
+  color: #0f172a;
+  margin-bottom: 10px;
+}
+
+.frontpage-subtitle {
+  color: #334155;
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.frontpage-upload-btn {
+  font-size: 13px;
+  padding: 10px 22px;
+}
+
+.frontpage-status {
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+body:not(.app-ready) #app {
+  display: none;
+}
+
+body.app-ready #frontpage {
+  display: none;
+}
+
 /* ── App grid ────────────────────────────────────────────────────────────── */
 #app {
   display: grid;
@@ -414,3 +476,17 @@ html, body {
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+@media (max-width: 820px) {
+  .frontpage-card {
+    padding: 26px 18px;
+  }
+
+  .frontpage-title {
+    font-size: 19px;
+  }
+
+  .frontpage-subtitle {
+    font-size: 13px;
+  }
+}

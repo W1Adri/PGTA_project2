@@ -18,6 +18,19 @@
 </head>
 <body>
 
+<section id="frontpage" aria-live="polite">
+  <div class="frontpage-card">
+    <div class="frontpage-brand">
+      <div class="logo-mark"></div>
+      <span class="logo-text">ASTERIX<span>&nbsp;Decoder</span></span>
+    </div>
+    <h1 class="frontpage-title">Upload an ASTERIX file to get started</h1>
+    <p class="frontpage-subtitle">Click to choose a file or drag and drop it here.</p>
+    <button class="upload-btn frontpage-upload-btn" id="front-upload-btn" data-upload-trigger="true">Upload File</button>
+    <p class="frontpage-status" id="front-status">Waiting for file upload.</p>
+  </div>
+</section>
+
 <div id="app">
 
   <!-- ── Header ──────────────────────────────────────────────────────────── -->
@@ -29,17 +42,16 @@
     </div>
 
     <div class="view-toggle">
-      <button class="view-btn" data-view="map">Map</button>
       <button class="view-btn" data-view="table">Table</button>
+      <button class="view-btn" data-view="map">Map</button>
     </div>
 
     <div class="header-actions">
       <span class="record-badge">Messages:&nbsp;<span class="count" id="record-count">—</span></span>
-      <button class="upload-btn" id="upload-btn">Upload File</button>
+      <button class="upload-btn" id="upload-btn" data-upload-trigger="true">Upload File</button>
       <button class="download-btn" id="download-btn" disabled>Download CSV</button>
     </div>
 
-    <input type="file" id="file-input" accept=".ast,.bin,application/octet-stream">
   </header>
 
   <!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
@@ -197,6 +209,8 @@
   </footer>
 
 </div>
+
+<input type="file" id="file-input" accept=".ast,.bin,application/octet-stream">
 
 <!-- Drop overlay -->
 <div id="drop-overlay">

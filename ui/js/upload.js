@@ -46,6 +46,11 @@ const Upload = (() => {
     if (badge) badge.textContent = value;
   }
 
+  function setFrontStatus(message) {
+    const el = document.getElementById("front-status");
+    if (el) el.textContent = message;
+  }
+
   // ── Upload logic ──────────────────────────────────────────────────────────────
   async function uploadFile(file) {
     if (!file) return;
@@ -60,6 +65,7 @@ const Upload = (() => {
     toast(`Processing file: ${file.name}`);
     setFileStatus(`Processing file... ${file.name}`);
     setMessageBadge("Processing...");
+    setFrontStatus(`Processing file: ${file.name}`);
 
     window.dispatchEvent(new CustomEvent("asterix:processing-start", {
       detail: { filename: file.name }
@@ -82,6 +88,7 @@ const Upload = (() => {
       setMessageBadge(meta.record_count?.toLocaleString() ?? "0");
 
       setFileStatus(`${file.name}  (${(file.size / 1024).toFixed(0)} KB)`);
+      setFrontStatus("File processed successfully. Opening dashboard...");
       toast(`Loaded ${meta.record_count?.toLocaleString() ?? "?"} messages.`, "success");
 
       // Enable download button
@@ -99,6 +106,7 @@ const Upload = (() => {
       toast(`Error: ${err.message}`, "error");
       setFileStatus("Upload failed.");
       setMessageBadge("—");
+      setFrontStatus("Processing failed. Upload another file to continue.");
       window.dispatchEvent(new CustomEvent("asterix:processing-end", {
         detail: { success: false, error: String(err?.message || err) }
       }));
@@ -143,10 +151,13 @@ const Upload = (() => {
   // ── File input (button) ───────────────────────────────────────────────────────
   function initFileInput() {
     const input  = document.getElementById("file-input");
-    const button = document.getElementById("upload-btn");
-    if (!input || !button) return;
+    const buttons = document.querySelectorAll("[data-upload-trigger='true']");
+    if (!input || buttons.length === 0) return;
 
-    button.addEventListener("click", () => input.click());
+    buttons.forEach(button => {
+      button.addEventListener("click", () => input.click());
+    });
+
     input.addEventListener("change", () => {
       const file = input.files?.[0];
       if (file) uploadFile(file);
@@ -194,6 +205,7 @@ const Upload = (() => {
     initDownload();
     setFileStatus(null);
     setMessageBadge("—");
+    setFrontStatus("Waiting for file upload.");
   }
 
   return { init, uploadFile };
