@@ -8,7 +8,7 @@ CSV_CAT021_COLUMNS = [
     "BP", 
     "RA", "TTA",
     "GS", "TAR", "TAS", "HDG", "IAS", "BAR", "IVV", 
-    "GS(kt)", "HDG", 
+    "GS(kt)", 
 ]
 
 

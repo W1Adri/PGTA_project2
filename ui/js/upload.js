@@ -18,6 +18,8 @@ const Upload = (() => {
   const API_URL = `${API_BASE}/upload`;
   const CSV_URL = `${API_BASE}/download/csv`;
 
+  let processingActive = false;
+
   // ── Toast helper ─────────────────────────────────────────────────────────────
   function toast(message, type = "info") {
     const container = document.getElementById("toast-container");
@@ -51,9 +53,106 @@ const Upload = (() => {
     if (el) el.textContent = message;
   }
 
+  function setUploadControlsDisabled(disabled) {
+    document.querySelectorAll("[data-upload-trigger='true']").forEach(button => {
+      button.disabled = disabled;
+    });
+
+    const input = document.getElementById("file-input");
+    if (input) input.disabled = disabled;
+  }
+
+  function setDownloadDisabled(disabled) {
+    const button = document.getElementById("download-btn");
+    if (button) button.disabled = disabled;
+  }
+
+  function setProcessingBanner(text, percent) {
+    const banner = document.getElementById("processing-banner");
+    const fill = document.getElementById("processing-fill");
+    const percentEl = document.getElementById("processing-percent");
+    const textEl = document.getElementById("processing-text");
+    if (!banner || !fill || !percentEl || !textEl) return;
+
+    const safePercent = Number.isFinite(percent)
+      ? Math.max(0, Math.min(100, percent))
+      : 0;
+
+    banner.hidden = false;
+    fill.style.width = `${safePercent}%`;
+    percentEl.textContent = `${Math.round(safePercent)}%`;
+    textEl.textContent = text;
+  }
+
+  function hideProcessingBanner() {
+    const banner = document.getElementById("processing-banner");
+    const fill = document.getElementById("processing-fill");
+    const percentEl = document.getElementById("processing-percent");
+    const textEl = document.getElementById("processing-text");
+    if (!banner || !fill || !percentEl || !textEl) return;
+
+    fill.style.width = "0%";
+    percentEl.textContent = "0%";
+    textEl.textContent = "Waiting to start.";
+    banner.hidden = true;
+  }
+
+  function formatProgress(data) {
+    const stage = data?.stage || "Processing file";
+    const percent = Number(data?.percent ?? 0);
+    const current = Number(data?.current ?? 0);
+    const total = Number(data?.total ?? 0);
+
+    if (Number.isFinite(total) && total > 0) {
+      return {
+        text: `${stage} · ${current.toLocaleString()} / ${total.toLocaleString()}`,
+        percent,
+      };
+    }
+
+    return { text: stage, percent };
+  }
+
+  function onDecodeProgress(payload) {
+    if (!processingActive) return;
+
+    const data = payload?.data || {};
+    const { text, percent } = formatProgress(data);
+
+    setProcessingBanner(text, percent);
+    setFrontStatus(text);
+
+    window.dispatchEvent(new CustomEvent("asterix:processing-progress", {
+      detail: {
+        ...data,
+        display_text: text,
+      },
+    }));
+  }
+
+  function startProcessingUI(filename) {
+    processingActive = true;
+    setUploadControlsDisabled(true);
+    setDownloadDisabled(true);
+    const overlay = document.getElementById("drop-overlay");
+    if (overlay) overlay.classList.remove("visible");
+    setProcessingBanner(`Preparing decoder for ${filename}`, 0);
+  }
+
+  function finishProcessingUI() {
+    processingActive = false;
+    setUploadControlsDisabled(false);
+    hideProcessingBanner();
+  }
+
   // ── Upload logic ──────────────────────────────────────────────────────────────
   async function uploadFile(file) {
     if (!file) return;
+
+    if (processingActive) {
+      toast("A file is already being processed.", "info");
+      return;
+    }
 
     // Basic validation — ASTERIX files are binary, typically .ast or no extension
     const maxSize = 200 * 1024 * 1024;  // 200 MB
@@ -66,6 +165,7 @@ const Upload = (() => {
     setFileStatus(`Processing file... ${file.name}`);
     setMessageBadge("Processing...");
     setFrontStatus(`Processing file: ${file.name}`);
+    startProcessingUI(file.name);
 
     window.dispatchEvent(new CustomEvent("asterix:processing-start", {
       detail: { filename: file.name }
@@ -92,14 +192,14 @@ const Upload = (() => {
       toast(`Loaded ${meta.record_count?.toLocaleString() ?? "?"} messages.`, "success");
 
       // Enable download button
-      const dlBtn = document.getElementById("download-btn");
-      if (dlBtn) dlBtn.disabled = false;
+      setDownloadDisabled(false);
 
       // Notify other modules
       window.dispatchEvent(new CustomEvent("asterix:loaded", { detail: meta }));
       window.dispatchEvent(new CustomEvent("asterix:processing-end", {
         detail: { success: true, metadata: meta }
       }));
+      finishProcessingUI();
 
     } catch (err) {
       console.error("[Upload] Error:", err);
@@ -110,6 +210,7 @@ const Upload = (() => {
       window.dispatchEvent(new CustomEvent("asterix:processing-end", {
         detail: { success: false, error: String(err?.message || err) }
       }));
+      finishProcessingUI();
     }
   }
 
@@ -122,11 +223,13 @@ const Upload = (() => {
 
     window.addEventListener("dragenter", (e) => {
       e.preventDefault();
+      if (processingActive) return;
       dragCounter++;
       if (dragCounter === 1) overlay.classList.add("visible");
     });
 
     window.addEventListener("dragleave", () => {
+      if (processingActive) return;
       dragCounter--;
       if (dragCounter <= 0) {
         dragCounter = 0;
@@ -136,10 +239,12 @@ const Upload = (() => {
 
     window.addEventListener("dragover", (e) => {
       e.preventDefault();  // required to allow drop
+      if (processingActive) return;
     });
 
     window.addEventListener("drop", (e) => {
       e.preventDefault();
+      if (processingActive) return;
       dragCounter = 0;
       overlay.classList.remove("visible");
 
@@ -203,9 +308,11 @@ const Upload = (() => {
     initDragDrop();
     initFileInput();
     initDownload();
+    WS.on("decode_progress", onDecodeProgress);
     setFileStatus(null);
     setMessageBadge("—");
     setFrontStatus("Waiting for file upload.");
+    hideProcessingBanner();
   }
 
   return { init, uploadFile };

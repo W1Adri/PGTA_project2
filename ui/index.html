@@ -5,6 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ASTERIX Decoder</title>
 
+  <script>
+    (function () {
+      if (window.__selectorCompatPatched) return;
+      window.__selectorCompatPatched = true;
+
+      function expandNotLists(selector) {
+        if (typeof selector !== "string" || selector.indexOf(":not(") === -1) {
+          return selector;
+        }
+
+        return selector.replace(/:not\(([^()]*)\)/g, (match, inner) => {
+          if (inner.indexOf(",") === -1) return match;
+          return inner
+            .split(",")
+            .map(part => part.trim())
+            .filter(Boolean)
+            .map(part => `:not(${part})`)
+            .join("");
+        });
+      }
+
+      function patchSelectorMethod(proto, methodName) {
+        const original = proto && proto[methodName];
+        if (!original || original.__selectorCompatPatched) return;
+
+        const patched = function (selector, ...args) {
+          try {
+            return original.call(this, selector, ...args);
+          } catch (error) {
+            const normalized = expandNotLists(selector);
+            if (normalized !== selector) {
+              return original.call(this, normalized, ...args);
+            }
+            throw error;
+          }
+        };
+
+        patched.__selectorCompatPatched = true;
+        proto[methodName] = patched;
+      }
+
+      patchSelectorMethod(Document.prototype, "querySelector");
+      patchSelectorMethod(Document.prototype, "querySelectorAll");
+      patchSelectorMethod(Element.prototype, "querySelector");
+      patchSelectorMethod(Element.prototype, "querySelectorAll");
+      patchSelectorMethod(Element.prototype, "matches");
+    })();
+  </script>
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -30,6 +79,19 @@
     <p class="frontpage-status" id="front-status">Waiting for file upload.</p>
   </div>
 </section>
+
+<div id="processing-banner" hidden aria-live="polite" aria-atomic="true">
+  <div class="processing-banner-card">
+    <div class="processing-banner-head">
+      <span class="processing-banner-title">Decoding ASTERIX data</span>
+      <span class="processing-banner-percent" id="processing-percent">0%</span>
+    </div>
+    <div class="processing-banner-track" aria-hidden="true">
+      <div class="processing-banner-fill" id="processing-fill"></div>
+    </div>
+    <p class="processing-banner-text" id="processing-text">Waiting to start.</p>
+  </div>
+</div>
 
 <div id="app">
 

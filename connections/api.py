@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
 
 from database.asterix_pandas import AsterixPandas
+from connections.websocket_handler import broadcast_message
 from user_actions.user_actions_manager import Actions
 
 
@@ -46,12 +47,19 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
         if not raw_bytes:
             raise HTTPException(status_code=400, detail="File is empty.")
 
+        def report_progress(detail: dict) -> None:
+            broadcast_message({
+                "type": "decode_progress",
+                "status": "ok",
+                "data": detail,
+            })
+
         try:
             from asterix_decoder.decoder_service import decode_asterix
 
             # Always start from a clean in-memory dataset per upload session.
             store.clear()
-            df = decode_asterix(raw_bytes)
+            df = decode_asterix(raw_bytes, progress_callback=report_progress)
             store.load_dataframe(df)
 
             return store.get_metadata()

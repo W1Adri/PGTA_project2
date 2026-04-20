@@ -228,6 +228,13 @@ const Table = (() => {
       : `<span>${(n || 0).toLocaleString()}</span> filtered messages`;
   }
 
+  function setProcessingFooter(message) {
+    const el = document.getElementById("table-row-count");
+    if (!el) return;
+
+    el.innerHTML = `<span style="color:var(--text-dim)">${message}</span>`;
+  }
+
   // ── Actions ───────────────────────────────────────────────────────────────
   
   function refreshGrid() {
@@ -258,6 +265,23 @@ const Table = (() => {
       gridApi.setGridOption("loading", true);
       updateFooter(0, true);
     }
+    setProcessingFooter("Processing uploaded file... 0%");
+  }
+
+  function onProcessingProgress(evt) {
+    if (!isProcessing) return;
+
+    const data = evt?.detail || {};
+    const stage = data.stage || "Processing uploaded file";
+    const percent = Number(data.percent ?? 0);
+    const current = Number(data.current ?? 0);
+    const total = Number(data.total ?? 0);
+
+    const suffix = Number.isFinite(total) && total > 0
+      ? ` (${current.toLocaleString()} / ${total.toLocaleString()}, ${Math.round(percent)}%)`
+      : ` (${Math.round(percent)}%)`;
+
+    setProcessingFooter(`${stage}${suffix}`);
   }
 
   function onProcessingEnd(evt) {
@@ -289,6 +313,7 @@ const Table = (() => {
     window.addEventListener("asterix:loaded", (e) => onDataLoaded(e.detail));
     window.addEventListener("asterix:processing-start", onProcessingStart);
     window.addEventListener("asterix:processing-end", onProcessingEnd);
+    window.addEventListener("asterix:processing-progress", onProcessingProgress);
 
     // 2. Listen for "apply_filters" button to trigger refresh
     const applyBtn = document.getElementById("btn-apply-filters");

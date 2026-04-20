@@ -1,3 +1,4 @@
+import multiprocessing
 import time
 import threading
 import os 
@@ -45,6 +46,9 @@ APP_HEIGHT = 900
 
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+
+    multiprocessing.freeze_support()
+    webview.settings["DRAG_REGION_SELECTOR"] = ".pywebview-drag-region"
 
     # 1. Shared in-memory store (single source of truth)
     store = AsterixPandas()

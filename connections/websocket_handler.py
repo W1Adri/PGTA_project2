@@ -1,10 +1,15 @@
 import asyncio
 import json
+from typing import Any
 
 import websockets
 from websockets.server import WebSocketServerProtocol
 
 from user_actions.user_actions_manager import Actions
+
+
+_SERVER_LOOP: asyncio.AbstractEventLoop | None = None
+_CLIENTS: set[WebSocketServerProtocol] = set()
 
 
 # ── Per-connection handler ────────────────────────────────────────────────────
@@ -14,6 +19,7 @@ async def _handle_connection(
     actions: Actions,
 ) -> None:
     """Lifecycle handler for a single browser connection."""
+    _CLIENTS.add(websocket)
     remote = websocket.remote_address
     print(f"[WS] Connected  — {remote}")
 
@@ -28,6 +34,7 @@ async def _handle_connection(
         print(f"[WS] Unexpected error from {remote}: {exc}")
         traceback.print_exc()
     finally:
+        _CLIENTS.discard(websocket)
         print(f"[WS] Disconnected — {remote}")
 
 
@@ -62,10 +69,40 @@ async def _send_error(websocket: WebSocketServerProtocol, detail: str) -> None:
     await websocket.send(payload)
 
 
+async def _broadcast(payload: dict[str, Any]) -> None:
+    if not _CLIENTS:
+        return
+
+    message = json.dumps(payload, default=str)
+    stale_clients: list[WebSocketServerProtocol] = []
+
+    for websocket in list(_CLIENTS):
+        try:
+            await websocket.send(message)
+        except Exception:
+            stale_clients.append(websocket)
+
+    for websocket in stale_clients:
+        _CLIENTS.discard(websocket)
+
+
+def broadcast_message(payload: dict[str, Any]) -> None:
+    """Thread-safe broadcast helper for progress updates and alerts."""
+    if _SERVER_LOOP is None or _SERVER_LOOP.is_closed():
+        return
+
+    try:
+        asyncio.run_coroutine_threadsafe(_broadcast(payload), _SERVER_LOOP)
+    except Exception:
+        pass
+
+
 # ── Server entry point ────────────────────────────────────────────────────────
 
 async def _run_server(actions: Actions, port: int) -> None:
     """Start the WebSocket server and keep it alive indefinitely."""
+    global _SERVER_LOOP
+    _SERVER_LOOP = asyncio.get_running_loop()
 
     # Wrap the per-connection coroutine so it receives `actions` via closure
     async def handler(ws: WebSocketServerProtocol):
