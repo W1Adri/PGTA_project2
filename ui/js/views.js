@@ -37,6 +37,17 @@ const Views = (() => {
     switchTo("table");
   }
 
+  function onSessionCleared() {
+    setShellState(false);
+    current = "table";
+
+    document.querySelectorAll(".view-panel").forEach(p =>
+      p.classList.toggle("active", p.dataset.view === current));
+
+    document.querySelectorAll(".view-btn").forEach(b =>
+      b.classList.toggle("active", b.dataset.view === current));
+  }
+
   function init() {
     setShellState(false);
 
@@ -50,6 +61,7 @@ const Views = (() => {
     });
 
     window.addEventListener("asterix:processing-end", onProcessingEnd);
+    window.addEventListener("asterix:session-cleared", onSessionCleared);
   }
 
   return { init, switchTo, current: () => current, isReady: () => appReady };

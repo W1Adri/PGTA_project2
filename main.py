@@ -12,7 +12,7 @@ if sys.platform.startswith("linux"):
 import webview
 from connections.api import create_api, start_api_server
 from connections.websocket_handler import start_websocket_server
-from database.asterix_pandas import AsterixPandas
+from asterix_decoder.database.asterix_pandas import AsterixPandas
 from user_actions.user_actions_manager import Actions
 
 class JSAPI:

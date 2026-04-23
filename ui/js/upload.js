@@ -19,6 +19,7 @@ const Upload = (() => {
   const CSV_URL = `${API_BASE}/download/csv`;
 
   let processingActive = false;
+  let fileLoaded = false;
 
   // ── Toast helper ─────────────────────────────────────────────────────────────
   function toast(message, type = "info") {
@@ -54,12 +55,28 @@ const Upload = (() => {
   }
 
   function setUploadControlsDisabled(disabled) {
-    document.querySelectorAll("[data-upload-trigger='true']").forEach(button => {
-      button.disabled = disabled;
-    });
+    const frontButton = document.getElementById("front-upload-btn");
+    if (frontButton) frontButton.disabled = disabled;
+
+    const headerButton = document.getElementById("upload-btn");
+    if (headerButton) headerButton.disabled = disabled;
 
     const input = document.getElementById("file-input");
     if (input) input.disabled = disabled;
+  }
+
+  function setHeaderUploadMode(mode) {
+    const button = document.getElementById("upload-btn");
+    if (!button) return;
+
+    if (mode === "exit") {
+      button.textContent = "Exit File";
+      button.dataset.action = "exit-file";
+      return;
+    }
+
+    button.textContent = "Upload File";
+    button.dataset.action = "upload-file";
   }
 
   function setDownloadDisabled(disabled) {
@@ -98,17 +115,17 @@ const Upload = (() => {
   }
 
   function formatProgress(data) {
-    const stage = data?.stage || "Processing file";
+    const stageMap = {
+      "Leyendo archivo ASTERIX": "Reading ASTERIX file",
+      "Separando mensajes": "Splitting messages",
+      "Leyendo FSPEC": "Parsing FSPEC",
+      "Preparando decodificadores": "Preparing decoders",
+      "Decodificando mensajes": "Decoding messages",
+      "Finalizando tabla": "Building final table",
+    };
+    const rawStage = data?.stage || "Processing file";
+    const stage = stageMap[rawStage] || rawStage;
     const percent = Number(data?.percent ?? 0);
-    const current = Number(data?.current ?? 0);
-    const total = Number(data?.total ?? 0);
-
-    if (Number.isFinite(total) && total > 0) {
-      return {
-        text: `${stage} · ${current.toLocaleString()} / ${total.toLocaleString()}`,
-        percent,
-      };
-    }
 
     return { text: stage, percent };
   }
@@ -125,6 +142,7 @@ const Upload = (() => {
     window.dispatchEvent(new CustomEvent("asterix:processing-progress", {
       detail: {
         ...data,
+        stage: text,
         display_text: text,
       },
     }));
@@ -143,6 +161,23 @@ const Upload = (() => {
     processingActive = false;
     setUploadControlsDisabled(false);
     hideProcessingBanner();
+  }
+
+  function clearCurrentFile() {
+    if (processingActive) return;
+
+    fileLoaded = false;
+    setHeaderUploadMode("upload");
+    setDownloadDisabled(true);
+    setMessageBadge("—");
+    setFileStatus(null);
+    setFrontStatus("Waiting for file upload.");
+    if (typeof Filters !== "undefined" && typeof Filters.resetFilters === "function") {
+      Filters.resetFilters({ apply: false });
+    }
+
+    window.dispatchEvent(new CustomEvent("asterix:session-cleared"));
+    toast("Returned to start menu.", "info");
   }
 
   // ── Upload logic ──────────────────────────────────────────────────────────────
@@ -193,6 +228,8 @@ const Upload = (() => {
 
       // Enable download button
       setDownloadDisabled(false);
+      fileLoaded = true;
+      setHeaderUploadMode("exit");
 
       // Notify other modules
       window.dispatchEvent(new CustomEvent("asterix:loaded", { detail: meta }));
@@ -256,11 +293,22 @@ const Upload = (() => {
   // ── File input (button) ───────────────────────────────────────────────────────
   function initFileInput() {
     const input  = document.getElementById("file-input");
-    const buttons = document.querySelectorAll("[data-upload-trigger='true']");
-    if (!input || buttons.length === 0) return;
+    const frontButton = document.getElementById("front-upload-btn");
+    const headerButton = document.getElementById("upload-btn");
+    if (!input || !frontButton || !headerButton) return;
 
-    buttons.forEach(button => {
-      button.addEventListener("click", () => input.click());
+    frontButton.addEventListener("click", () => {
+      if (processingActive) return;
+      input.click();
+    });
+
+    headerButton.addEventListener("click", () => {
+      if (processingActive) return;
+      if (headerButton.dataset.action === "exit-file") {
+        clearCurrentFile();
+        return;
+      }
+      input.click();
     });
 
     input.addEventListener("change", () => {
@@ -312,6 +360,7 @@ const Upload = (() => {
     setFileStatus(null);
     setMessageBadge("—");
     setFrontStatus("Waiting for file upload.");
+    setHeaderUploadMode("upload");
     hideProcessingBanner();
   }
 

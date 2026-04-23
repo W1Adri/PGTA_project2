@@ -34,14 +34,80 @@
 
 .filter-input::placeholder { color: var(--text-dim); }
 
-/* ── Range (two inputs side by side) ─────────────────────────────────────── */
-.filter-range {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
+/* ── Range slider ───────────────────────────────────────────────────────── */
+.range-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.filter-range .filter-input { text-align: center; }
+/* ── Range visualization bar ─────────────────────────────────────────────── */
+.range-visual {
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-light);
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  cursor: ew-resize;
+}
+
+.range-visual-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0%;
+  width: 100%;
+  background: linear-gradient(90deg, #2f6fda, #1a56a8);
+}
+
+.range-thumb {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #1a56a8;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.16);
+  transform: translate(-50%, -50%);
+  cursor: ew-resize;
+  touch-action: none;
+  appearance: none;
+  z-index: 2;
+}
+
+.range-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(26, 86, 168, 0.2), rgba(26, 86, 168, 0.06));
+}
+
+.range-thumb:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-light), 0 2px 8px rgba(17, 24, 39, 0.16);
+}
+
+.range-thumb-start { z-index: 3; }
+.range-thumb-end { z-index: 4; }
+
+.range-values {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+body.range-dragging {
+  user-select: none;
+  cursor: ew-resize;
+}
 
 /* ── Checkboxes ──────────────────────────────────────────────────────────── */
 .filter-check-group { display: flex; flex-direction: column; gap: 2px; }
@@ -93,6 +159,115 @@
   font-size: 12px;
   color: var(--text-secondary);
   user-select: none;
+}
+
+.sidebar-section.no-collapse .sidebar-section-header.static {
+  cursor: default;
+}
+
+.sidebar-section-header.filter-header-with-marker {
+  justify-content: space-between;
+}
+
+.filter-header-marker {
+  margin: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.sidebar-section-header.filter-header-with-marker .filter-check-item:hover,
+.sidebar-section-header.static .filter-check-item:hover {
+  background: transparent;
+}
+
+.target-airlines-block {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  margin-bottom: 6px;
+}
+
+.target-airlines-toggle {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.target-airlines-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.target-airlines-groups {
+  padding: 4px;
+}
+
+.target-airlines-block.collapsed .target-airlines-groups {
+  display: none;
+}
+
+.target-airlines-block.collapsed .target-airlines-toggle-icon {
+  transform: rotate(-90deg);
+}
+
+.target-group-block {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  margin-bottom: 6px;
+}
+
+.target-group-header {
+  margin: 0;
+  flex: 1;
+}
+
+.target-group-head-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.target-group-toggle {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1;
+  transition: background var(--transition), transform var(--transition);
+}
+
+.target-group-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.target-group-block.collapsed .target-group-members {
+  display: none;
+}
+
+.target-group-block.collapsed .target-group-toggle {
+  transform: rotate(-90deg);
+}
+
+.target-group-members {
+  padding: 0 6px 6px 20px;
+}
+
+.target-member-item {
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
 /* ── Tag input ───────────────────────────────────────────────────────────── */

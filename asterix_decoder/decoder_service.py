@@ -1,22 +1,8 @@
-"""
-decoder_service.py
-──────────────────────────────────────────────────────────────────────────────
-Consolidates the full ASTERIX decoding pipeline (notebook Blocks 1–6) into a
-single callable entry point for the web application.
-
-    from asterix_decoder.decoder_service import decode_asterix
-    final_df = decode_asterix(raw_bytes)      # → pd.DataFrame
-"""
-
 from __future__ import annotations
 
 import importlib
 import importlib.util
 import inspect
-import math
-import multiprocessing as mp
-import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Callable
 
@@ -24,8 +10,9 @@ import pandas as pd
 
 from asterix_decoder.data_items.data_item import ItemXXX
 from asterix_decoder.data_tables.uap_tables import uap021_df, uap048_df
-from asterix_decoder.data_tables.csv_table import CSV_CAT021_COLUMNS, CSV_CAT048_COLUMNS
+from asterix_decoder.data_tables.csv_table import CAT021_COLUMNS, CAT048_COLUMNS, COMBINED_COLUMNS
 from asterix_decoder.helpers.compute_target_lat_lon import compute_target_lat_lon
+from asterix_decoder.optimization import decode_messages
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Module-level caches (computed once, reused across uploads)
@@ -34,11 +21,6 @@ from asterix_decoder.helpers.compute_target_lat_lon import compute_target_lat_lo
 _CLASS_MAP: dict[tuple[int, str], type] | None = None
 _UAP_DF: pd.DataFrame | None = None
 _FRN_MAP: dict[tuple[int, int], Any] | None = None
-_WORKER_FRN_MAP: dict[tuple[int, int], Any] | None = None
-
-_PARALLEL_MIN_MESSAGES = 256
-_PARALLEL_BATCH_MIN = 64
-_PARALLEL_BATCH_MAX = 512
 
 # Pre-computed FSPEC lookup tables (from notebook Block 3)
 _ACTIVE_OFFSETS: tuple[tuple[int, ...], ...] = tuple(
@@ -191,75 +173,6 @@ def _ensure_uap_ready() -> dict[tuple[int, int], Any]:
     return _FRN_MAP
 
 
-def _available_cpu_count() -> int:
-    """Return the CPU budget visible to this process."""
-    try:
-        affinity = len(os.sched_getaffinity(0))
-        if affinity > 0:
-            return affinity
-    except AttributeError:
-        pass
-    except NotImplementedError:
-        pass
-
-    return os.cpu_count() or 1
-
-
-def _resolve_worker_count(
-    total_messages: int,
-    workers: int | None = None,
-) -> int:
-    """Pick a worker count that matches the current machine and workload."""
-    if total_messages < _PARALLEL_MIN_MESSAGES:
-        return 1
-
-    if workers is not None:
-        return max(1, min(int(workers), total_messages))
-
-    visible_cpus = _available_cpu_count()
-
-    # On this machine the best throughput came from using roughly half of the
-    # visible CPUs for the CPU-bound decode, while leaving some headroom for
-    # the GUI and the interpreter overhead.
-    cpu_budget = max(2, visible_cpus // 2)
-
-    # Small uploads do not benefit from the full pool because worker start-up
-    # and IPC dominate; scale the pool with the size of the job.
-    workload_budget = max(2, math.ceil(total_messages / 40_000))
-
-    return max(1, min(total_messages, cpu_budget, workload_budget))
-
-
-def _resolve_batch_size(
-    total_messages: int,
-    worker_count: int,
-    batch_size: int | None = None,
-) -> int:
-    """Pick a batch size that balances process overhead and load balance."""
-    if total_messages <= 0:
-        return 1
-
-    if batch_size is not None:
-        return max(1, min(int(batch_size), total_messages))
-
-    target_batches_per_worker = 6
-    auto_batch_size = math.ceil(total_messages / max(1, worker_count * target_batches_per_worker))
-    return max(
-        _PARALLEL_BATCH_MIN,
-        min(_PARALLEL_BATCH_MAX, auto_batch_size),
-    )
-
-
-def _resolve_parallel_config(
-    total_messages: int,
-    workers: int | None = None,
-    batch_size: int | None = None,
-) -> tuple[int, int]:
-    worker_count = _resolve_worker_count(total_messages, workers)
-    resolved_batch_size = _resolve_batch_size(total_messages, worker_count, batch_size)
-    return worker_count, resolved_batch_size
-
-
 def _emit_progress(
     progress_callback: Callable[[dict[str, Any]], None] | None,
     *,
@@ -282,119 +195,6 @@ def _emit_progress(
         progress_callback(payload)
     except Exception:
         pass
-
-
-def _chunk_message_specs(
-    message_specs: list[tuple[int, int, list[int], bytes]],
-    chunk_size: int,
-):
-    for start in range(0, len(message_specs), chunk_size):
-        yield message_specs[start:start + chunk_size]
-
-
-def _worker_bootstrap() -> None:
-    global _WORKER_FRN_MAP
-    _WORKER_FRN_MAP = _ensure_uap_ready()
-
-
-def _decode_message_batch(
-    batch: list[tuple[int, int, list[int], bytes]],
-) -> list[tuple[int, dict[str, Any]]]:
-    if _WORKER_FRN_MAP is None:
-        _worker_bootstrap()
-
-    assert _WORKER_FRN_MAP is not None
-    decoded: list[tuple[int, dict[str, Any]]] = []
-
-    for index, cat, frns, data_fields in batch:
-        decoded.append((index, _decode_message(cat, frns, data_fields, _WORKER_FRN_MAP)))
-
-    return decoded
-
-
-def _decode_messages_sequential(
-    message_specs: list[tuple[int, int, list[int], bytes]],
-    progress_callback: Callable[[dict[str, Any]], None] | None = None,
-) -> list[dict[str, Any]]:
-    total = len(message_specs)
-    frn_map = _ensure_uap_ready()
-    decoded: list[dict[str, Any]] = []
-
-    for index, (_, cat, frns, data_fields) in enumerate(message_specs, start=1):
-        decoded.append(_decode_message(cat, frns, data_fields, frn_map))
-        _emit_progress(
-            progress_callback,
-            stage="Decodificando mensajes",
-            current=index,
-            total=total,
-            percent=25.0 + (70.0 * index / total) if total else 95.0,
-        )
-
-    return decoded
-
-
-def _decode_messages_parallel(
-    message_specs: list[tuple[int, int, list[int], bytes]],
-    progress_callback: Callable[[dict[str, Any]], None] | None = None,
-    workers: int | None = None,
-    batch_size: int | None = None,
-) -> list[dict[str, Any]]:
-    total = len(message_specs)
-    worker_count, resolved_batch_size = _resolve_parallel_config(
-        total,
-        workers=workers,
-        batch_size=batch_size,
-    )
-
-    if worker_count < 2 or total < _PARALLEL_MIN_MESSAGES:
-        return _decode_messages_sequential(message_specs, progress_callback)
-
-    batches = list(_chunk_message_specs(message_specs, resolved_batch_size))
-    decoded: list[dict[str, Any] | None] = [None] * total
-    completed = 0
-
-    print(
-        f"[Decoder] Parallel decode: {total:,} messages, "
-        f"{worker_count} workers, {len(batches)} batches "
-        f"(batch_size={resolved_batch_size})"
-    )
-
-    try:
-        ctx = mp.get_context("spawn")
-        with ProcessPoolExecutor(
-            max_workers=worker_count,
-            mp_context=ctx,
-            initializer=_worker_bootstrap,
-        ) as executor:
-            future_map = {
-                executor.submit(_decode_message_batch, batch): len(batch)
-                for batch in batches
-            }
-
-            for future in as_completed(future_map):
-                batch_results = future.result()
-                for index, data in batch_results:
-                    decoded[index] = data
-
-                completed += future_map[future]
-                _emit_progress(
-                    progress_callback,
-                    stage="Decodificando mensajes",
-                    current=completed,
-                    total=total,
-                    percent=25.0 + (70.0 * completed / total) if total else 95.0,
-                )
-
-    except Exception as exc:
-        if completed == 0:
-            print(f"[Decoder] Parallel decode fallback: {exc}")
-            return _decode_messages_sequential(message_specs, progress_callback)
-        raise
-
-    if any(item is None for item in decoded):
-        raise RuntimeError("Parallel decode finished with missing rows.")
-
-    return [item for item in decoded if item is not None]
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -462,13 +262,14 @@ def _build_final_df(messages_df: pd.DataFrame) -> pd.DataFrame:
 
     # Determine output columns based on categories found
     if cats_present == {48}:
-        target_cols = CSV_CAT048_COLUMNS.copy()
+        target_cols = CAT048_COLUMNS.copy()
     elif cats_present == {21}:
-        target_cols = CSV_CAT021_COLUMNS.copy()
+        target_cols = CAT021_COLUMNS.copy()
         target_cols.append("GBS")
     else:
-        shared = set(CSV_CAT021_COLUMNS).intersection(CSV_CAT048_COLUMNS)
-        target_cols = [c for c in CSV_CAT048_COLUMNS if c in shared]
+        target_cols = COMBINED_COLUMNS.copy()
+        target_cols.append("GBS")
+
 
     # Ensure CAT is the first column
     target_cols = [c for c in target_cols if c != "CAT"]
@@ -519,6 +320,12 @@ def _build_final_df(messages_df: pd.DataFrame) -> pd.DataFrame:
         final_df = final_df[~(final_df["GBS"] == 1)].reset_index(drop=True)
         final_df = final_df.drop(columns=["GBS"], errors="ignore")
 
+    # ── Filter 3 · Drop rows with no decoded payload fields ───────────────
+    payload_cols = [c for c in final_df.columns if c != "CAT"]
+    if payload_cols:
+        has_payload = final_df[payload_cols].notna().any(axis=1)
+        final_df = final_df[has_payload].reset_index(drop=True)
+
     return final_df
 
 
@@ -551,7 +358,7 @@ def decode_asterix(
 
     _emit_progress(
         progress_callback,
-        stage="Leyendo archivo ASTERIX",
+        stage="Reading file .ast",
         current=0,
         total=100,
         percent=0.0,
@@ -563,26 +370,24 @@ def decode_asterix(
 
     _emit_progress(
         progress_callback,
-        stage="Separando mensajes",
+        stage="Splitting messages",
         current=len(messages_df),
         total=len(messages_df) or 1,
         percent=10.0,
     )
 
-    # Step 2: parse FSPEC for each message
-    records = messages_df["data_record"].tolist()
-    parsed = list(map(_parse_fspec, records))
-    messages_df = messages_df.assign(
-        frns=[p[0] for p in parsed],
-        data_fields=[p[1] for p in parsed],
-    )
+    # Step 2: parse FSPEC and build decode specs in a single pass
+    message_specs: list[tuple[int, int, list[int], bytes]] = []
+    for index, row in enumerate(messages_df[["cat", "data_record"]].itertuples(index=False)):
+        frns, data_fields = _parse_fspec(row.data_record)
+        message_specs.append((index, int(row.cat), frns, data_fields))
 
     _emit_progress(
         progress_callback,
-        stage="Leyendo FSPEC",
-        current=len(messages_df),
-        total=len(messages_df) or 1,
-        percent=20.0,
+        stage="Reading FSPEC",
+        current=len(message_specs),
+        total=len(message_specs) or 1,
+        percent=15.0,
     )
 
     # Step 3: ensure UAP decoders are ready (cached after first call)
@@ -590,20 +395,17 @@ def decode_asterix(
 
     _emit_progress(
         progress_callback,
-        stage="Preparando decodificadores",
+        stage="Preparing decoders",
         current=len(messages_df),
         total=len(messages_df) or 1,
-        percent=25.0,
+        percent=20.0,
     )
 
-    message_specs: list[tuple[int, int, list[int], bytes]] = [
-        (index, int(row.cat), row.frns, row.data_fields)
-        for index, row in enumerate(messages_df.itertuples(index=False))
-    ]
-
     # Step 4: decode every message
-    decoded_rows = _decode_messages_parallel(
+    decoded_rows = decode_messages(
         message_specs,
+        _decode_message,
+        _ensure_uap_ready,
         progress_callback=progress_callback,
         workers=workers,
         batch_size=batch_size,
@@ -614,7 +416,7 @@ def decode_asterix(
     final_df = _build_final_df(messages_df)
     _emit_progress(
         progress_callback,
-        stage="Finalizando tabla",
+        stage="Finalizing table",
         current=len(final_df),
         total=len(final_df) or 1,
         percent=100.0,

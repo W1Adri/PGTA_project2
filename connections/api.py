@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
 
-from database.asterix_pandas import AsterixPandas
+from asterix_decoder.database.asterix_pandas import AsterixPandas
 from connections.websocket_handler import broadcast_message
 from user_actions.user_actions_manager import Actions
 
@@ -99,15 +99,11 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
         sort_col = body.get("sortCol")
         sort_dir = body.get("sortDir")
         
-        # filters is what we pass to kwargs
-        filters = body.get("filters", {})
-
         result = store.filter_paginated(
             start_row=start_row,
             end_row=end_row,
             sort_col=sort_col,
             sort_dir=sort_dir,
-            **filters
         )
         return result
 

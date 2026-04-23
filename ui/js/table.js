@@ -16,6 +16,7 @@ const Table = (() => {
   const BLOCK_SIZE = 100;
   const WINDOW_MARGIN = 400;
   const RETAIN_MARGIN = 1000;
+  const REQUEST_TIMEOUT_MS = 8000;
 
   function nextRequestId() {
     requestSeq += 1;
@@ -23,14 +24,29 @@ const Table = (() => {
   }
 
   function clearCache() {
+    const staleRequests = [...pendingRequests.values()];
+    staleRequests.forEach((pending) => {
+      if (pending.timeoutId) clearTimeout(pending.timeoutId);
+    });
     rowCache.clear();
     pendingRequests.clear();
     lastKnownTotalCount = 0;
     cacheGeneration += 1;
+
+    staleRequests.forEach((pending) => {
+      try {
+        pending.failCallback();
+      } catch {
+        // Ignore datasource callback failures during cache invalidation.
+      }
+    });
   }
 
   function hasCachedRange(startRow, endRow) {
-    for (let i = startRow; i < endRow; i += 1) {
+    const limit = lastKnownTotalCount > 0
+      ? Math.min(endRow, lastKnownTotalCount)
+      : endRow;
+    for (let i = startRow; i < limit; i += 1) {
       if (!rowCache.has(i)) return false;
     }
     return true;
@@ -38,7 +54,10 @@ const Table = (() => {
 
   function buildRowsFromCache(startRow, endRow) {
     const rows = [];
-    for (let i = startRow; i < endRow; i += 1) {
+    const limit = lastKnownTotalCount > 0
+      ? Math.min(endRow, lastKnownTotalCount)
+      : endRow;
+    for (let i = startRow; i < limit; i += 1) {
       rows.push(rowCache.get(i) || null);
     }
     return rows;
@@ -68,7 +87,6 @@ const Table = (() => {
   function requestWindow(params) {
     const startRow = params.startRow;
     const endRow = params.endRow;
-    const filters = typeof Filters !== "undefined" ? Filters.getActive() : {};
     const { sortCol, sortDir } = getSortFromParams(params);
     const requestId = nextRequestId();
 
@@ -78,6 +96,17 @@ const Table = (() => {
       endRow,
       successCallback: params.successCallback,
       failCallback: params.failCallback,
+      timeoutId: setTimeout(() => {
+        const stale = pendingRequests.get(requestId);
+        if (!stale) return;
+        pendingRequests.delete(requestId);
+        stale.failCallback();
+        if (gridApi) {
+          gridApi.setGridOption("loading", false);
+          updateFooter(0, false);
+          gridApi.showNoRowsOverlay();
+        }
+      }, REQUEST_TIMEOUT_MS),
     });
 
     const sent = WS.send({
@@ -88,13 +117,18 @@ const Table = (() => {
       margin: WINDOW_MARGIN,
       sortCol,
       sortDir,
-      filters,
     });
 
     if (!sent) {
+      const pending = pendingRequests.get(requestId);
+      if (pending?.timeoutId) clearTimeout(pending.timeoutId);
       pendingRequests.delete(requestId);
       params.failCallback();
-      if (gridApi) gridApi.setGridOption("loading", false);
+      if (gridApi) {
+        gridApi.setGridOption("loading", false);
+        updateFooter(0, false);
+        gridApi.showNoRowsOverlay();
+      }
     }
   }
 
@@ -104,6 +138,7 @@ const Table = (() => {
     if (!requestId || !pendingRequests.has(requestId)) return;
 
     const pending = pendingRequests.get(requestId);
+    if (pending?.timeoutId) clearTimeout(pending.timeoutId);
     pendingRequests.delete(requestId);
 
     if (pending.generation !== cacheGeneration) return;
@@ -172,8 +207,23 @@ const Table = (() => {
 
     gridDiv.innerHTML = ""; // Clear existing grid if any
     
+    const rowNumberCol = {
+      headerName: "#",
+      colId: "row_number",
+      width: 80,
+      minWidth: 70,
+      maxWidth: 100,
+      pinned: "left",
+      sortable: false,
+      filter: false,
+      resizable: false,
+      suppressMovable: true,
+      valueGetter: (params) => (params?.node?.rowIndex ?? 0) + 1,
+      cellClass: "table-row-index",
+    };
+
     // Map data columns to AG Grid format
-    const columnDefs = columns.map(col => ({
+    const dataColumnDefs = columns.map(col => ({
       field: col,
       headerName: col,
       sortable: true,
@@ -185,8 +235,10 @@ const Table = (() => {
       }
     }));
 
+    const columnDefs = [rowNumberCol, ...dataColumnDefs];
+
     // If no columns, show placeholder
-    if (columnDefs.length === 0) {
+    if (dataColumnDefs.length === 0) {
       columnDefs.push({ headerName: "No Data", field: "empty" });
     }
 
@@ -196,13 +248,16 @@ const Table = (() => {
       cacheBlockSize: BLOCK_SIZE,
       maxBlocksInCache: 10,
       datasource: datasource,
-      rowSelection: { mode: 'singleRow' },
+      rowSelection: undefined,
+      suppressRowClickSelection: true,
       loading: false,
       overlayLoadingTemplate: '<span class="ag-overlay-loading-center">Loading messages...</span>',
       overlayNoRowsTemplate: '<span class="ag-overlay-loading-center">No messages to display</span>',
       defaultColDef: {
         flex: 1, // Automatically expand columns to fit width
-        minWidth: 100
+        minWidth: 100,
+        cellStyle: { textAlign: "center" },
+        headerClass: "table-header-centered"
       }
     };
 
@@ -274,14 +329,7 @@ const Table = (() => {
     const data = evt?.detail || {};
     const stage = data.stage || "Processing uploaded file";
     const percent = Number(data.percent ?? 0);
-    const current = Number(data.current ?? 0);
-    const total = Number(data.total ?? 0);
-
-    const suffix = Number.isFinite(total) && total > 0
-      ? ` (${current.toLocaleString()} / ${total.toLocaleString()}, ${Math.round(percent)}%)`
-      : ` (${Math.round(percent)}%)`;
-
-    setProcessingFooter(`${stage}${suffix}`);
+    setProcessingFooter(`${stage} (${Math.round(percent)}%)`);
   }
 
   function onProcessingEnd(evt) {
@@ -295,6 +343,17 @@ const Table = (() => {
         updateFooter(0, true);
         gridApi.showNoRowsOverlay();
       }
+    }
+  }
+
+  function onSessionCleared() {
+    isProcessing = false;
+    hasDatasetLoaded = false;
+    clearCache();
+    if (gridApi) {
+      gridApi.setGridOption("loading", false);
+      updateFooter(0, true);
+      gridApi.showNoRowsOverlay();
     }
   }
 
@@ -314,15 +373,10 @@ const Table = (() => {
     window.addEventListener("asterix:processing-start", onProcessingStart);
     window.addEventListener("asterix:processing-end", onProcessingEnd);
     window.addEventListener("asterix:processing-progress", onProcessingProgress);
+    window.addEventListener("asterix:session-cleared", onSessionCleared);
 
-    // 2. Listen for "apply_filters" button to trigger refresh
-    const applyBtn = document.getElementById("btn-apply-filters");
-    if (applyBtn) {
-        applyBtn.addEventListener("click", () => {
-            // Wait slightly for standard Filters logic to update states if needed
-            setTimeout(refreshGrid, 50); 
-        });
-    }
+    // 2. Refresh table only after backend confirms temporary pandas refresh
+    window.addEventListener("asterix:filters-applied", refreshGrid);
 
     // 3. WS fallback if WS pushes "apply_filters_result" (optional, but good for map sync)
     // WS.on("apply_filters_result", refreshGrid);

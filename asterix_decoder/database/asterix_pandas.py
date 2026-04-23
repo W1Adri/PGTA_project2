@@ -13,12 +13,15 @@ from typing import Any
 
 import pandas as pd
 
+from asterix_decoder.database.filters import AsterixFilters
+
 class AsterixPandas:
     """Thread-safe in-memory store for a decoded ASTERIX session."""
 
     def __init__(self):
         self._lock = threading.RLock()
         self._df: pd.DataFrame = pd.DataFrame()
+        self._filters = AsterixFilters()
 
     # ── Loading ───────────────────────────────────────────────────────────────
 
@@ -33,69 +36,42 @@ class AsterixPandas:
         """
         with self._lock:
             self._df = df.reset_index(drop=True)
+            self._filters.set_base_dataframe(self._df)
+            self._filters.apply_filters(categories=["CAT021", "CAT048"])
         print(f"[Store] Loaded {len(self._df):,} records  ({len(self._df.columns)} columns).")
 
     # ── Querying ──────────────────────────────────────────────────────────────
 
-    def _col(self, *candidates: str) -> str | None:
-        """Return the first column name found in the current DataFrame."""
+    def _col_from(self, df: pd.DataFrame, *candidates: str) -> str | None:
+        """Return the first matching column name in the provided DataFrame."""
         for c in candidates:
-            if c in self._df.columns:
+            if c in df.columns:
                 return c
         return None
 
-    def _apply_filters(
-        self,
-        *,
-        callsigns: list[str] | None = None,
-        categories: list[str] | None = None,
-        squawks: list[str] | None = None,
-        altitude_min: float | None = None,
-        altitude_max: float | None = None,
-        time_start: str | None = None,
-        time_end: str | None = None,
-    ) -> pd.DataFrame:
-        if self._df.empty:
-            return self._df
-            
-        df = self._df
+    @staticmethod
+    def _seconds_to_hms(seconds: float | int) -> str:
+        sec = max(0, int(seconds)) % 86400
+        h = sec // 3600
+        m = (sec % 3600) // 60
+        s = sec % 60
+        return f"{h:02d}:{m:02d}:{s:02d}"
 
-        # — Callsign / Target ID —
-        id_col = self._col("TARGET_IDENTIFICATION", "callsign")
-        if callsigns and id_col:
-            df = df[df[id_col].isin(callsigns)]
+    def apply_temporary_filters(self, **filters: Any) -> dict[str, Any]:
+        """Rebuild the temporary filtered DataFrame from the original DataFrame."""
+        with self._lock:
+            filtered_df = self._filters.apply_filters(**filters)
+            return {
+                "active_filters": self._filters.get_active_filters(),
+                "count": len(filtered_df),
+            }
 
-        # — Category —
-        cat_col = self._col("CAT", "category")
-        if categories and cat_col:
-            df = df[df[cat_col].isin(categories)]
+    def reset_temporary_filters(self) -> None:
+        with self._lock:
+            self._filters.apply_filters(categories=["CAT021", "CAT048"])
 
-        # — Squawk —
-        sqk_col = self._col("MODE_3/A", "squawk")
-        if squawks and sqk_col:
-            df = df[df[sqk_col].astype(str).isin(squawks)]
-
-        # — Altitude (flight level) —
-        alt_col = self._col("FL", "altitude_ft")
-        if alt_col:
-            alt = pd.to_numeric(df[alt_col], errors="coerce")
-            if altitude_min is not None:
-                df = df[alt >= altitude_min]
-                alt = pd.to_numeric(df[alt_col], errors="coerce")
-            if altitude_max is not None:
-                df = df[alt <= altitude_max]
-
-        # — Time range —
-        time_col = self._col("TIME", "timestamp")
-        if time_col:
-            t = pd.to_numeric(df[time_col], errors="coerce")
-            if time_start is not None:
-                df = df[t >= float(time_start)] if t.notna().any() else df
-            if time_end is not None:
-                t = pd.to_numeric(df[time_col], errors="coerce")
-                df = df[t <= float(time_end)] if t.notna().any() else df
-
-        return df
+    def _current_df(self) -> pd.DataFrame:
+        return self._filters.get_filtered_dataframe()
 
     def filter(
         self,
@@ -105,7 +81,10 @@ class AsterixPandas:
         Apply optional filters and return ALL matching records as dicts.
         """
         with self._lock:
-            df = self._apply_filters(**kwargs)
+            if kwargs:
+                df = self._filters.apply_filters(**kwargs)
+            else:
+                df = self._current_df()
             if df.empty:
                 return []
             return df.astype(object).where(pd.notna(df), None).to_dict(orient="records")
@@ -122,7 +101,10 @@ class AsterixPandas:
         Apply filters, sort, paginate, and return records + total count.
         """
         with self._lock:
-            df = self._apply_filters(**kwargs)
+            if kwargs:
+                df = self._filters.apply_filters(**kwargs)
+            else:
+                df = self._current_df()
             if df.empty:
                 return {"records": [], "count": 0}
             
@@ -157,7 +139,10 @@ class AsterixPandas:
         and include extra rows on both sides to reduce round-trips while scrolling.
         """
         with self._lock:
-            df = self._apply_filters(**kwargs)
+            if kwargs:
+                df = self._filters.apply_filters(**kwargs)
+            else:
+                df = self._current_df()
             total_count = len(df)
             if total_count == 0:
                 return {
@@ -191,9 +176,10 @@ class AsterixPandas:
     def get_all(self) -> list[dict]:
         """Return every record (no filters)."""
         with self._lock:
-            if self._df.empty:
+            df = self._current_df()
+            if df.empty:
                 return []
-            return self._df.astype(object).where(pd.notna(self._df), None).to_dict(orient="records")
+            return df.astype(object).where(pd.notna(df), None).to_dict(orient="records")
 
     # ── Metadata ──────────────────────────────────────────────────────────────
 
@@ -203,63 +189,80 @@ class AsterixPandas:
             if self._df.empty:
                 return {
                     "record_count":      0,
+                    "record_count_original": 0,
                     "columns":           [],
                     "time_start":        None,
                     "time_end":          None,
                     "unique_callsigns":  [],
                     "unique_categories": [],
                     "unique_squawks":    [],
+                    "category_filter_options": self._filters.get_category_filter_options(),
+                    "target_identification_filter": {
+                        "groups": [],
+                        "all_values": [],
+                    },
                     "altitude_min":      None,
                     "altitude_max":      None,
                 }
 
-            df = self._df
+            base_df = self._df
+            filtered_df = self._current_df()
             meta: dict[str, Any] = {
-                "record_count": len(df),
-                "columns":      list(df.columns),
+                "record_count": len(filtered_df),
+                "record_count_original": len(base_df),
+                "columns":      list(base_df.columns),
+                "category_filter_options": self._filters.get_category_filter_options(),
+                "target_identification_filter": self._filters.get_target_identification_filter(),
             }
 
             # Time
-            time_col = self._col("TIME", "timestamp")
-            if time_col and time_col in df.columns:
-                t = pd.to_numeric(df[time_col], errors="coerce")
-                meta["time_start"] = float(t.min()) if t.notna().any() else None
-                meta["time_end"]   = float(t.max()) if t.notna().any() else None
+            time_col = self._col_from(base_df, "TIME", "timestamp")
+            if time_col and time_col in base_df.columns:
+                t = pd.to_numeric(
+                    base_df[time_col].map(AsterixFilters._parse_time_filter_value),
+                    errors="coerce",
+                )
+                if t.notna().any():
+                    meta["time_start"] = self._seconds_to_hms(float(t.min()))
+                    meta["time_end"] = self._seconds_to_hms(float(t.max()))
+                else:
+                    meta["time_start"] = None
+                    meta["time_end"] = None
             else:
                 meta["time_start"] = None
                 meta["time_end"]   = None
 
             # Callsigns
-            id_col = self._col("TARGET_IDENTIFICATION", "callsign")
+            id_col = self._col_from(base_df, "TARGET_IDENTIFICATION", "callsign")
             if id_col:
                 meta["unique_callsigns"] = sorted(
-                    df[id_col].dropna().astype(str).unique().tolist()
+                    base_df[id_col].dropna().astype(str).unique().tolist()
                 )
             else:
                 meta["unique_callsigns"] = []
 
             # Categories
-            cat_col = self._col("CAT", "category")
+            cat_col = self._col_from(base_df, "CAT", "category")
             if cat_col:
                 meta["unique_categories"] = sorted(
-                    df[cat_col].dropna().astype(str).unique().tolist()
+                    base_df[cat_col].dropna().astype(str).unique().tolist()
                 )
             else:
                 meta["unique_categories"] = []
 
             # Squawks
-            sqk_col = self._col("MODE_3/A", "squawk")
+            sqk_col = self._col_from(base_df, "MODE_3/A", "squawk")
             if sqk_col:
                 meta["unique_squawks"] = sorted(
-                    df[sqk_col].dropna().astype(str).unique().tolist()
+                    base_df[sqk_col].dropna().astype(str).unique().tolist()
                 )
             else:
                 meta["unique_squawks"] = []
 
             # Altitude range
-            alt_col = self._col("FL", "altitude_ft")
+            alt_col = self._col_from(base_df, "FL", "altitude_ft")
             if alt_col:
-                alt = pd.to_numeric(df[alt_col], errors="coerce")
+                alt = pd.to_numeric(base_df[alt_col], errors="coerce")
                 meta["altitude_min"] = float(alt.min()) if alt.notna().any() else None
                 meta["altitude_max"] = float(alt.max()) if alt.notna().any() else None
             else:
@@ -274,7 +277,8 @@ class AsterixPandas:
         """Serialize the current DataFrame to CSV bytes (European format)."""
         with self._lock:
             buf = io.BytesIO()
-            self._df.to_csv(
+            current_df = self._current_df()
+            current_df.to_csv(
                 buf,
                 index=False,
                 sep=";",
@@ -288,6 +292,7 @@ class AsterixPandas:
     def clear(self) -> None:
         with self._lock:
             self._df = pd.DataFrame()
+            self._filters.clear()
             print("[Store] Cleared.")
 
     def __len__(self) -> int:

@@ -46,6 +46,10 @@ const AppMap = (() => {
     box.querySelector("[data-info='t-end']")  .textContent = fmt(time_end);
   }
 
+  function resetInfoBox() {
+    updateInfoBox({ record_count: null, time_start: null, time_end: null });
+  }
+
   function onDataLoaded(meta) {
     updateInfoBox(meta);
     if (leaflet) setTimeout(() => leaflet.invalidateSize(), 50);
@@ -67,6 +71,7 @@ const AppMap = (() => {
 
   function setup() {
     window.addEventListener("asterix:loaded", e => onDataLoaded(e.detail));
+    window.addEventListener("asterix:session-cleared", resetInfoBox);
   }
 
   return { setup, init, onPanelVisible, renderRecords, clearLayers };

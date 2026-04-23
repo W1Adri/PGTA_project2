@@ -68,6 +68,15 @@
   width: 100%;
 }
 
+.ag-theme-quartz .ag-cell-value {
+  width: 100%;
+  text-align: center;
+}
+
+.ag-theme-quartz .table-header-centered .ag-header-cell-label {
+  justify-content: center;
+}
+
 /* Ensure empty/loading state text uses proper fonts */
 .ag-overlay-loading-center {
   background: var(--bg-elevated) !important;
