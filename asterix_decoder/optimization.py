@@ -235,7 +235,7 @@ def decode_messages(
                         stage="Decodificando mensajes",
                         current=completed,
                         total=total,
-                        percent=20.0 + (60.0 * completed / total) if total else 80.0,
+                        percent=20.0 + (79.0 * completed / total) if total else 99.0,
                     )
                     submit_next()
 

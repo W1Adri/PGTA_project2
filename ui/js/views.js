@@ -29,7 +29,7 @@ const Views = (() => {
     if (view === "map") AppMap.onPanelVisible();
   }
 
-  function onProcessingEnd(evt) {
+  function onTableReady(evt) {
     const ok = !!evt?.detail?.success;
     if (!ok) return;
 
@@ -60,7 +60,7 @@ const Views = (() => {
       b.addEventListener("click", () => switchTo(b.dataset.view));
     });
 
-    window.addEventListener("asterix:processing-end", onProcessingEnd);
+    window.addEventListener("asterix:table-ready", onTableReady);
     window.addEventListener("asterix:session-cleared", onSessionCleared);
   }
 

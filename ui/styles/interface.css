@@ -50,8 +50,10 @@ html, body {
 
 #frontpage {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   padding: 24px;
   background:
     radial-gradient(circle at 14% 12%, rgba(26, 86, 168, 0.16), transparent 44%),
@@ -110,27 +112,48 @@ body.app-ready #frontpage {
   display: none;
 }
 
-/* ── Processing banner ─────────────────────────────────────────────────── */
-#processing-banner {
+/* ── Upload progress panel ─────────────────────────────────────────────── */
+.upload-progress-stack-box {
+  width: min(680px, 100%);
+  margin-top: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.upload-progress-stack-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.upload-progress-stack-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.upload-progress-current-box {
+  width: min(680px, 100%);
   position: fixed;
   left: 50%;
-  bottom: 34px;
+  bottom: 7vh;
   transform: translateX(-50%);
-  width: min(640px, calc(100vw - 32px));
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(26, 86, 168, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 246, 252, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   z-index: 1200;
-  pointer-events: none;
 }
 
-.processing-banner-card {
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(17, 24, 39, 0.10);
-  border-radius: 14px;
-  box-shadow: 0 20px 38px rgba(17, 24, 39, 0.16);
-  backdrop-filter: blur(10px);
-  padding: 16px 18px 14px;
-}
-
-.processing-banner-head {
+.upload-progress-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -138,7 +161,7 @@ body.app-ready #frontpage {
   margin-bottom: 10px;
 }
 
-.processing-banner-title {
+.upload-progress-title {
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 500;
@@ -147,14 +170,47 @@ body.app-ready #frontpage {
   text-transform: uppercase;
 }
 
-.processing-banner-percent {
+.upload-progress-percent {
   font-family: var(--mono);
   font-size: 11px;
   color: var(--accent);
   white-space: nowrap;
 }
 
-.processing-banner-track {
+.upload-progress-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 190px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.upload-progress-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.upload-progress-entry::before {
+  content: '•';
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.upload-progress-entry.is-complete {
+  color: var(--text-primary);
+}
+
+.upload-progress-entry.is-complete::before {
+  content: '✓';
+}
+
+.upload-progress-track {
   width: 100%;
   height: 9px;
   border-radius: 999px;
@@ -162,7 +218,7 @@ body.app-ready #frontpage {
   overflow: hidden;
 }
 
-.processing-banner-fill {
+.upload-progress-fill {
   width: 0%;
   height: 100%;
   border-radius: inherit;
@@ -170,11 +226,27 @@ body.app-ready #frontpage {
   transition: width 180ms ease;
 }
 
-.processing-banner-text {
+.upload-progress-text {
   margin-top: 10px;
   font-family: var(--mono);
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+.upload-progress-stack-box[hidden],
+.upload-progress-current-box[hidden] {
+  display: none;
+}
+
+body.uploading .frontpage-title,
+body.uploading .frontpage-subtitle,
+body.uploading .frontpage-upload-btn,
+body.uploading .frontpage-status {
+  display: none;
+}
+
+body.uploading .upload-progress-stack-box {
+  display: block;
 }
 
 /* ── App grid ────────────────────────────────────────────────────────────── */

@@ -76,20 +76,24 @@
     <h1 class="frontpage-title">Upload an ASTERIX file to get started</h1>
     <p class="frontpage-subtitle">Click to choose a file or drag and drop it here.</p>
     <button class="upload-btn frontpage-upload-btn" id="front-upload-btn" data-upload-trigger="true">Upload File</button>
-    <p class="frontpage-status" id="front-status">Waiting for file upload.</p>
+    <div class="upload-progress-stack-box" hidden>
+        <div class="upload-progress-stack-head">
+          <span class="upload-progress-title">Completed stages</span>
+          <span class="upload-progress-stack-count" id="upload-progress-stack-count">0</span>
+        </div>
+        <div class="upload-progress-log" id="upload-progress-log"></div>
+    </div>
   </div>
 </section>
 
-<div id="processing-banner" hidden aria-live="polite" aria-atomic="true">
-  <div class="processing-banner-card">
-    <div class="processing-banner-head">
-      <span class="processing-banner-title">Decoding ASTERIX data</span>
-      <span class="processing-banner-percent" id="processing-percent">0%</span>
-    </div>
-    <div class="processing-banner-track" aria-hidden="true">
-      <div class="processing-banner-fill" id="processing-fill"></div>
-    </div>
-    <p class="processing-banner-text" id="processing-text">Waiting to start.</p>
+<div class="upload-progress-current-box" id="upload-progress-current-box" hidden aria-live="polite" aria-atomic="true">
+  <div class="upload-progress-head">
+    <span class="upload-progress-title" id="upload-progress-stage">Waiting to start</span>
+    <span class="upload-progress-percent" id="upload-progress-percent">0%</span>
+  </div>
+  <p class="upload-progress-text" id="upload-progress-text">Waiting to start.</p>
+  <div class="upload-progress-track" aria-hidden="true">
+    <div class="upload-progress-fill" id="upload-progress-fill"></div>
   </div>
 </div>
 

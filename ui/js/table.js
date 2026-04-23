@@ -12,6 +12,7 @@ const Table = (() => {
   let isProcessing = false;
   let pendingRequests = new Map();
   let rowCache = new Map(); // absolute_row_index -> row data
+  let tableReadyDispatched = false;
 
   const BLOCK_SIZE = 100;
   const WINDOW_MARGIN = 400;
@@ -40,6 +41,14 @@ const Table = (() => {
         // Ignore datasource callback failures during cache invalidation.
       }
     });
+  }
+
+  function dispatchTableReady() {
+    if (tableReadyDispatched) return;
+    tableReadyDispatched = true;
+    window.dispatchEvent(new CustomEvent("asterix:table-ready", {
+      detail: { success: true },
+    }));
   }
 
   function hasCachedRange(startRow, endRow) {
@@ -172,6 +181,8 @@ const Table = (() => {
 
     updateFooter(totalCount, false);
     if (gridApi) gridApi.setGridOption("loading", false);
+
+    dispatchTableReady();
   }
 
   // ── AG Grid Datasource ──────────────────────────────────────────────────
@@ -304,12 +315,17 @@ const Table = (() => {
       const columns = meta.columns || [];
       isProcessing = false;
       hasDatasetLoaded = true;
+      tableReadyDispatched = false;
       clearCache();
       if (gridApi) {
           gridApi.destroy();
       }
       initGrid(columns);
       refreshGrid();
+
+      if ((meta.record_count ?? 0) === 0) {
+        dispatchTableReady();
+      }
   }
 
   function onProcessingStart() {
@@ -349,6 +365,7 @@ const Table = (() => {
   function onSessionCleared() {
     isProcessing = false;
     hasDatasetLoaded = false;
+    tableReadyDispatched = false;
     clearCache();
     if (gridApi) {
       gridApi.setGridOption("loading", false);
