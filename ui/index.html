@@ -5,6 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ASTERIX Decoder</title>
 
+  <script>
+    (function () {
+      if (window.__selectorCompatPatched) return;
+      window.__selectorCompatPatched = true;
+
+      function expandNotLists(selector) {
+        if (typeof selector !== "string" || selector.indexOf(":not(") === -1) {
+          return selector;
+        }
+
+        return selector.replace(/:not\(([^()]*)\)/g, (match, inner) => {
+          if (inner.indexOf(",") === -1) return match;
+          return inner
+            .split(",")
+            .map(part => part.trim())
+            .filter(Boolean)
+            .map(part => `:not(${part})`)
+            .join("");
+        });
+      }
+
+      function patchSelectorMethod(proto, methodName) {
+        const original = proto && proto[methodName];
+        if (!original || original.__selectorCompatPatched) return;
+
+        const patched = function (selector, ...args) {
+          try {
+            return original.call(this, selector, ...args);
+          } catch (error) {
+            const normalized = expandNotLists(selector);
+            if (normalized !== selector) {
+              return original.call(this, normalized, ...args);
+            }
+            throw error;
+          }
+        };
+
+        patched.__selectorCompatPatched = true;
+        proto[methodName] = patched;
+      }
+
+      patchSelectorMethod(Document.prototype, "querySelector");
+      patchSelectorMethod(Document.prototype, "querySelectorAll");
+      patchSelectorMethod(Element.prototype, "querySelector");
+      patchSelectorMethod(Element.prototype, "querySelectorAll");
+      patchSelectorMethod(Element.prototype, "matches");
+    })();
+  </script>
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -27,9 +76,26 @@
     <h1 class="frontpage-title">Upload an ASTERIX file to get started</h1>
     <p class="frontpage-subtitle">Click to choose a file or drag and drop it here.</p>
     <button class="upload-btn frontpage-upload-btn" id="front-upload-btn" data-upload-trigger="true">Upload File</button>
-    <p class="frontpage-status" id="front-status">Waiting for file upload.</p>
+    <div class="upload-progress-stack-box" hidden>
+        <div class="upload-progress-stack-head">
+          <span class="upload-progress-title">Completed stages</span>
+          <span class="upload-progress-stack-count" id="upload-progress-stack-count">0</span>
+        </div>
+        <div class="upload-progress-log" id="upload-progress-log"></div>
+    </div>
   </div>
 </section>
+
+<div class="upload-progress-current-box" id="upload-progress-current-box" hidden aria-live="polite" aria-atomic="true">
+  <div class="upload-progress-head">
+    <span class="upload-progress-title" id="upload-progress-stage">Waiting to start</span>
+    <span class="upload-progress-percent" id="upload-progress-percent">0%</span>
+  </div>
+  <p class="upload-progress-text" id="upload-progress-text">Waiting to start.</p>
+  <div class="upload-progress-track" aria-hidden="true">
+    <div class="upload-progress-fill" id="upload-progress-fill"></div>
+  </div>
+</div>
 
 <div id="app">
 
@@ -47,9 +113,9 @@
     </div>
 
     <div class="header-actions">
-      <span class="record-badge">Messages:&nbsp;<span class="count" id="record-count">—</span></span>
-      <button class="upload-btn" id="upload-btn" data-upload-trigger="true">Upload File</button>
+      <span class="record-badge">Messages:&nbsp;<span class="count" id="record-count">—</span><span id="filtered-count-label"></span></span>
       <button class="download-btn" id="download-btn" disabled>Download CSV</button>
+      <button class="upload-btn" id="upload-btn" data-upload-trigger="true">Upload File</button>
     </div>
 
   </header>
@@ -58,52 +124,8 @@
   <aside id="sidebar">
     <div class="sidebar-inner">
 
-      <!-- TIME RANGE -->
-      <div class="sidebar-section">
-        <div class="sidebar-section-header">
-          <span class="sidebar-section-title">Time Range</span>
-          <span class="sidebar-section-chevron">&#9660;</span>
-        </div>
-        <div class="sidebar-section-body">
-          <label class="filter-label" for="f-time-start">From</label>
-          <input class="filter-input" type="datetime-local" id="f-time-start" step="1">
-          <label class="filter-label" for="f-time-end">To</label>
-          <input class="filter-input" type="datetime-local" id="f-time-end" step="1">
-        </div>
-      </div>
-
-      <!-- CALLSIGNS -->
-      <div class="sidebar-section">
-        <div class="sidebar-section-header">
-          <span class="sidebar-section-title">Callsigns</span>
-          <span class="sidebar-section-chevron">&#9660;</span>
-        </div>
-        <div class="sidebar-section-body">
-          <label class="filter-label">Flight Identifiers</label>
-          <div class="filter-tags" id="f-callsign-tags">
-            <input type="text" id="f-callsign-input" placeholder="Type and press Enter...">
-          </div>
-          <p class="filter-hint">Press Enter or comma to add. Backspace to remove.</p>
-        </div>
-      </div>
-
-      <!-- ALTITUDE -->
-      <div class="sidebar-section">
-        <div class="sidebar-section-header">
-          <span class="sidebar-section-title">Altitude</span>
-          <span class="sidebar-section-chevron">&#9660;</span>
-        </div>
-        <div class="sidebar-section-body">
-          <label class="filter-label">Band (feet)</label>
-          <div class="filter-range">
-            <input class="filter-input" type="number" id="f-alt-min" placeholder="Min" min="0" max="60000" step="500">
-            <input class="filter-input" type="number" id="f-alt-max" placeholder="Max" min="0" max="60000" step="500">
-          </div>
-        </div>
-      </div>
-
       <!-- CATEGORIES -->
-      <div class="sidebar-section">
+      <div class="sidebar-section" id="f-categories-section" style="display:none;">
         <div class="sidebar-section-header">
           <span class="sidebar-section-title">ASTERIX Category</span>
           <span class="sidebar-section-chevron">&#9660;</span>
@@ -111,46 +133,116 @@
         <div class="sidebar-section-body">
           <div class="filter-check-group" id="f-categories-container">
             <label class="filter-check-item">
-              <input type="checkbox" data-filter-group="f-categories" value="CAT048" checked>
-              <span class="filter-check-label">CAT048 — Monoradar</span>
-            </label>
-            <label class="filter-check-item">
-              <input type="checkbox" data-filter-group="f-categories" value="CAT062" checked>
-              <span class="filter-check-label">CAT062 — SDPS Track</span>
-            </label>
-            <label class="filter-check-item">
               <input type="checkbox" data-filter-group="f-categories" value="CAT021" checked>
               <span class="filter-check-label">CAT021 — ADS-B</span>
             </label>
             <label class="filter-check-item">
-              <input type="checkbox" data-filter-group="f-categories" value="CAT010">
-              <span class="filter-check-label">CAT010 — MLAT</span>
+              <input type="checkbox" data-filter-group="f-categories" value="CAT048" checked>
+              <span class="filter-check-label">CAT048 — Monoradar</span>
             </label>
           </div>
         </div>
       </div>
 
-      <!-- SQUAWK -->
+      <!-- TIME RANGE -->
       <div class="sidebar-section">
         <div class="sidebar-section-header">
-          <span class="sidebar-section-title">Squawk</span>
+          <span class="sidebar-section-title">Time Range</span>
           <span class="sidebar-section-chevron">&#9660;</span>
         </div>
         <div class="sidebar-section-body">
-          <label class="filter-label" for="f-squawk">Mode-A Code(s)</label>
-          <input class="filter-input" type="text" id="f-squawk" placeholder="e.g. 7700, 2000">
-          <p class="filter-hint">Comma-separated. Octal notation.</p>
+          <div class="range-slider" data-range-kind="time">
+            <div class="range-visual" id="f-time-range-track">
+              <div class="range-visual-fill" id="f-time-range-fill"></div>
+              <button type="button" class="range-thumb range-thumb-start" id="f-time-start-thumb" aria-label="Adjust start time"></button>
+              <button type="button" class="range-thumb range-thumb-end" id="f-time-end-thumb" aria-label="Adjust end time"></button>
+            </div>
+            <div class="range-values" id="f-time-range-values" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FL RANGE -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-header">
+          <span class="sidebar-section-title">FLIGHT LEVEL</span>
+          <span class="sidebar-section-chevron">&#9660;</span>
+        </div>
+        <div class="sidebar-section-body">
+          <div class="range-slider" data-range-kind="fl">
+            <div class="range-visual" id="f-fl-range-track">
+              <div class="range-visual-fill" id="f-fl-range-fill"></div>
+              <button type="button" class="range-thumb range-thumb-start" id="f-fl-min-thumb" aria-label="Adjust minimum flight level"></button>
+              <button type="button" class="range-thumb range-thumb-end" id="f-fl-max-thumb" aria-label="Adjust maximum flight level"></button>
+            </div>
+            <div class="range-values" id="f-fl-range-values" aria-live="polite"></div>
+          </div>
+          <label class="filter-check-item" for="f-fl-keep-null">
+            <input type="checkbox" id="f-fl-keep-null" checked>
+            <span class="filter-check-label">Keep FL NULL</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- ON GROUND -->
+      <div class="sidebar-section no-collapse">
+        <div class="sidebar-section-header static">
+          <label class="filter-check-item filter-header-marker">
+            <input type="checkbox" id="f-on-ground" checked>
+            <span class="filter-check-label">ON GROUND</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- PURE WHITE -->
+      <div class="sidebar-section no-collapse">
+        <div class="sidebar-section-header static">
+          <label class="filter-check-item filter-header-marker">
+            <input type="checkbox" id="f-pure-white">
+            <span class="filter-check-label">PURE WHITE</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- FIX TRANSPONDER -->
+      <div class="sidebar-section collapsed">
+        <div class="sidebar-section-header filter-header-with-marker">
+          <label class="filter-check-item filter-header-marker">
+            <input type="checkbox" id="f-fix-transponder-all" checked>
+            <span class="filter-check-label">FIX TRANSPONDER</span>
+          </label>
+          <span class="sidebar-section-chevron">&#9660;</span>
+        </div>
+        <div class="sidebar-section-body">
+          <div class="filter-check-group" id="f-fix-transponder-container">
+            <p class="filter-hint">Upload a file to load FIX TRANSPONDER targets.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TARGET IDENTIFICATION -->
+      <div class="sidebar-section collapsed">
+        <div class="sidebar-section-header filter-header-with-marker">
+          <label class="filter-check-item filter-header-marker">
+            <input type="checkbox" id="f-target-identification-all" checked>
+            <span class="filter-check-label">TARGET IDENTIFICATION</span>
+          </label>
+          <span class="sidebar-section-chevron">&#9660;</span>
+        </div>
+        <div class="sidebar-section-body">
+          <div class="filter-check-group" id="f-target-identification-container">
+            <p class="filter-hint">Upload a file to load target identifications.</p>
+          </div>
         </div>
       </div>
 
     </div>
 
     <div class="sidebar-footer">
-      <button class="apply-btn" id="btn-apply-filters">
-        Apply Filters
-        <span class="filter-count-pill" id="filter-active-count" style="display:none;">0</span>
-      </button>
-      <button class="reset-btn" id="btn-reset-filters">Reset Filters</button>
+      <div class="sidebar-footer-meta">
+        <span class="sidebar-footer-text" id="table-row-count"><span>0</span> messages</span>
+      </div>
+      <button class="reset-btn" id="btn-reset-filters" disabled>Reset Filters</button>
     </div>
   </aside>
 
@@ -161,10 +253,19 @@
     <div class="view-panel" data-view="map" id="map-panel">
       <div id="map"></div>
 
-      <div class="map-info-box" id="map-info-box">
-        <div class="info-row"><span>Messages</span><span class="info-val" data-info="count">—</span></div>
-        <div class="info-row"><span>Start</span><span class="info-val" data-info="t-start">—</span></div>
-        <div class="info-row"><span>End</span><span class="info-val" data-info="t-end">—</span></div>
+      <div class="map-legend-box" id="map-legend-box" aria-live="polite"></div>
+
+      <div class="map-player" id="map-player">
+        <div class="map-player-shell">
+          <div class="map-player-actions">
+            <button type="button" class="map-player-btn primary" id="map-player-toggle" title="Play" aria-label="Play" disabled>▶</button>
+            <button type="button" class="map-player-btn map-player-speed" id="map-player-speed" title="Playback speed" aria-label="Playback speed" disabled>x1</button>
+            <div class="map-player-time" id="map-player-time">--:--:--</div>
+          </div>
+          <div class="map-player-track-wrap">
+            <input type="range" id="map-player-range" min="0" max="0" value="0" step="1" disabled>
+          </div>
+        </div>
       </div>
 
       <!-- empty state removed — map is always visible -->
@@ -173,19 +274,10 @@
     <!-- TABLE VIEW -->
     <div class="view-panel" data-view="table" id="table-panel">
 
-      <div class="table-toolbar">
-        <span class="table-toolbar-title">Target Reports</span>
-        <input class="table-search" type="text" id="table-search" placeholder="Quick search...">
-      </div>
-
       <!-- empty state removed — table is always visible -->
 
       <div class="table-scroll" style="display:none; height: 100%; min-height: 400px;">
         <div id="myGrid" class="ag-theme-quartz" style="height: 100%; width: 100%;"></div>
-      </div>
-
-      <div class="table-footer">
-        <span class="table-footer-text" id="table-row-count"><span>0</span> messages</span>
       </div>
 
     </div>

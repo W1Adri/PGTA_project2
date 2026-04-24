@@ -1,7 +1,7 @@
 import json
 from websockets.server import WebSocketServerProtocol
 
-from database.asterix_pandas import AsterixPandas
+from asterix_decoder.database.asterix_pandas import AsterixPandas
 
 
 class Actions:
@@ -33,6 +33,9 @@ class Actions:
 
         elif action == "get_table_window":
             await self.action_get_table_window(websocket, data)
+
+        elif action == "get_map_window":
+            await self.action_get_map_window(websocket, data)
 
         # ── TODO: register new actions here ──────────────────────────────────
         # elif action == "your_new_action":
@@ -93,6 +96,12 @@ class Actions:
         filters = {
             "callsigns"   : data.get("callsigns"),
             "categories"  : data.get("categories"),
+            "target_identifications": data.get("target_identifications"),
+            "on_ground"   : data.get("on_ground"),
+            "pure_white"  : data.get("pure_white"),
+            "fl_min"      : data.get("fl_min"),
+            "fl_max"      : data.get("fl_max"),
+            "fl_keep_null": data.get("fl_keep_null"),
             "squawks"     : data.get("squawks"),
             "altitude_min": data.get("altitude_min"),
             "altitude_max": data.get("altitude_max"),
@@ -100,11 +109,11 @@ class Actions:
             "time_end"    : data.get("time_end"),
         }
 
-        records = self.store.filter(**filters)
+        result = self.store.apply_temporary_filters(**filters)
         await self._send(websocket, {
             "type"  : "apply_filters_result",
             "status": "ok",
-            "data"  : {"records": records[:5000], "count": len(records)},
+            "data"  : result,
         })
 
     async def action_get_metadata(
@@ -185,21 +194,63 @@ class Actions:
         sort_dir = data.get("sortDir")
         request_id = data.get("request_id")
 
-        raw_filters = data.get("filters") or {}
-        if not isinstance(raw_filters, dict):
-            raw_filters = {}
-
         result = self.store.get_table_window(
             start_row=start_row,
             end_row=end_row,
             margin=margin,
             sort_col=sort_col,
             sort_dir=sort_dir,
-            **raw_filters,
         )
 
         await self._send(websocket, {
             "type": "table_window_result",
+            "status": "ok",
+            "data": {
+                "request_id": request_id,
+                **result,
+            },
+        })
+
+    async def action_get_map_window(
+        self,
+        websocket: WebSocketServerProtocol,
+        data: dict,
+    ) -> None:
+        """
+        Return a time-based window of the filtered dataset for the map player.
+
+        Request:
+          {
+            "action": "get_map_window",
+            "current_time": 12345,         // required, seconds or parseable time
+            "window_before": 20,           // optional, seconds before current_time
+            "window_after": 20,            // optional, seconds after current_time
+            "max_points": 2000,            // optional cap for frontend rendering
+            "request_id": "..."           // optional client correlation id
+          }
+
+        Response:
+          {
+            "type": "map_window_result",
+            "status": "ok",
+            "data": { "request_id": "...", "records": [ ... ] }
+          }
+        """
+        request_id = data.get("request_id")
+        current_time = data.get("current_time")
+        window_before = int(data.get("window_before", 20))
+        window_after = int(data.get("window_after", 20))
+        max_points = int(data.get("max_points", 2000))
+
+        result = self.store.get_map_window(
+            current_time=current_time,
+            window_before=window_before,
+            window_after=window_after,
+            max_points=max_points,
+        )
+
+        await self._send(websocket, {
+            "type": "map_window_result",
             "status": "ok",
             "data": {
                 "request_id": request_id,

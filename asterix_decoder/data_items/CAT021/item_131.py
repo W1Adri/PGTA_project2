@@ -35,7 +35,7 @@ class Item131(DataItem):
 
     def _bits_to_data(self, data, LAT: int, LON: int) -> dict[str, any]:
         # Expect exactly 8 octets: 4 for latitude, 4 for longitude
-        data["LAT"] = round(LAT * 1.6764e-7, 8)
-        data["LON"] = round(LON * 1.6764e-7, 8)
+        data["LAT"] = round(LAT * 180/2**30, 8)
+        data["LON"] = round(LON * 180/2**30, 8)
 
         return data

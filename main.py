@@ -1,3 +1,4 @@
+import multiprocessing
 import time
 import threading
 import os 
@@ -11,7 +12,7 @@ if sys.platform.startswith("linux"):
 import webview
 from connections.api import create_api, start_api_server
 from connections.websocket_handler import start_websocket_server
-from database.asterix_pandas import AsterixPandas
+from asterix_decoder.database.asterix_pandas import AsterixPandas
 from user_actions.user_actions_manager import Actions
 
 class JSAPI:
@@ -45,6 +46,9 @@ APP_HEIGHT = 900
 
 # ── Bootstrap ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+
+    multiprocessing.freeze_support()
+    webview.settings["DRAG_REGION_SELECTOR"] = ".pywebview-drag-region"
 
     # 1. Shared in-memory store (single source of truth)
     store = AsterixPandas()

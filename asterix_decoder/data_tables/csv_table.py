@@ -1,5 +1,5 @@
 
-CSV_CAT021_COLUMNS = [
+CAT021_COLUMNS = [
     "CAT", "SAC", "SIC", "TIME", 
     "LAT", "LON", "H(m)", "H(ft)",
     "MODE_3/A", 
@@ -8,11 +8,11 @@ CSV_CAT021_COLUMNS = [
     "BP", 
     "RA", "TTA",
     "GS", "TAR", "TAS", "HDG", "IAS", "BAR", "IVV", 
-    "GS(kt)", "HDG", 
+    "GS(kt)", 
 ]
 
 
-CSV_CAT048_COLUMNS = [
+CAT048_COLUMNS = [
     "CAT", "SAC", "SIC", "TIME", 
     "LAT", "LON", "H(m)", "H(ft)",
     "TYP_020", "SIM_020", "RDP_020", "SPI_020", "RAB_020", "TST_020", "ERR_020",
@@ -38,5 +38,24 @@ CSV_CAT048_COLUMNS = [
     "CNF_170", "RAD_170", "DOU_170", "MAH_170", "CDM_170", "TRE_170", "GHO_170", "SUP_170", "TCC_170",
     "HEIGHT",
     "COM_230", "STAT_230", "SI_230", "MSCC_230", "ARC_230", "AIC_230", "B1A_230", "B1B_230",
+]
+
+COMBINED_COLUMNS = [
+    "CAT", "SAC", "SIC", "TIME", 
+    "LAT", "LON", "H(m)", "H(ft)",
+    "TYP_020", 
+    "RHO", "THETA",
+    "MODE_3/A",
+    "FL", "MODE_C_CORRECTED",
+    "TARGET_ADDRESS", "TARGET_IDENTIFICATION",
+    "MODE_S",
+    "BP", 
+    "RA", "TTA", 
+    "GS", "TAR", "TAS", 
+    "HDG", "IAS", 
+    "MACH", "BAR", "IVV", 
+    "TRACK_NUMBER",
+    "GS_KT", "HEADING",
+    "STAT_230",
 ]
 

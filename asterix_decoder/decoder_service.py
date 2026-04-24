@@ -1,27 +1,18 @@
-"""
-decoder_service.py
-──────────────────────────────────────────────────────────────────────────────
-Consolidates the full ASTERIX decoding pipeline (notebook Blocks 1–6) into a
-single callable entry point for the web application.
-
-    from asterix_decoder.decoder_service import decode_asterix
-    final_df = decode_asterix(raw_bytes)      # → pd.DataFrame
-"""
-
 from __future__ import annotations
 
 import importlib
 import importlib.util
 import inspect
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pandas as pd
 
 from asterix_decoder.data_items.data_item import ItemXXX
 from asterix_decoder.data_tables.uap_tables import uap021_df, uap048_df
-from asterix_decoder.data_tables.csv_table import CSV_CAT021_COLUMNS, CSV_CAT048_COLUMNS
+from asterix_decoder.data_tables.csv_table import CAT021_COLUMNS, CAT048_COLUMNS, COMBINED_COLUMNS
 from asterix_decoder.helpers.compute_target_lat_lon import compute_target_lat_lon
+from asterix_decoder.optimization import decode_messages
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Module-level caches (computed once, reused across uploads)
@@ -182,6 +173,30 @@ def _ensure_uap_ready() -> dict[tuple[int, int], Any]:
     return _FRN_MAP
 
 
+def _emit_progress(
+    progress_callback: Callable[[dict[str, Any]], None] | None,
+    *,
+    stage: str,
+    current: int,
+    total: int,
+    percent: float,
+) -> None:
+    if progress_callback is None:
+        return
+
+    payload = {
+        "stage": stage,
+        "current": int(current),
+        "total": int(total),
+        "percent": round(max(0.0, min(100.0, float(percent))), 1),
+    }
+
+    try:
+        progress_callback(payload)
+    except Exception:
+        pass
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Block 5 — Decode each message into structured fields
 # ══════════════════════════════════════════════════════════════════════════════
@@ -247,17 +262,29 @@ def _build_final_df(messages_df: pd.DataFrame) -> pd.DataFrame:
 
     # Determine output columns based on categories found
     if cats_present == {48}:
-        target_cols = CSV_CAT048_COLUMNS.copy()
+        target_cols = CAT048_COLUMNS.copy()
     elif cats_present == {21}:
-        target_cols = CSV_CAT021_COLUMNS.copy()
+        target_cols = CAT021_COLUMNS.copy()
         target_cols.append("GBS")
     else:
-        shared = set(CSV_CAT021_COLUMNS).intersection(CSV_CAT048_COLUMNS)
-        target_cols = [c for c in CSV_CAT048_COLUMNS if c in shared]
+        target_cols = COMBINED_COLUMNS.copy()
+        target_cols.append("GBS")
+
 
     # Ensure CAT is the first column
     target_cols = [c for c in target_cols if c != "CAT"]
     target_cols = ["CAT"] + target_cols
+
+    # Pandas and AG Grid both expect unique column names. Keep the first
+    # occurrence so the schema stays stable even if a source list repeats a name.
+    unique_cols: list[str] = []
+    seen_cols: set[str] = set()
+    for col in target_cols:
+        if col in seen_cols:
+            continue
+        unique_cols.append(col)
+        seen_cols.add(col)
+    target_cols = unique_cols
 
     # Build rows from decoded dicts
     rows = []
@@ -293,6 +320,12 @@ def _build_final_df(messages_df: pd.DataFrame) -> pd.DataFrame:
         final_df = final_df[~(final_df["GBS"] == 1)].reset_index(drop=True)
         final_df = final_df.drop(columns=["GBS"], errors="ignore")
 
+    # ── Filter 3 · Drop rows with no decoded payload fields ───────────────
+    payload_cols = [c for c in final_df.columns if c != "CAT"]
+    if payload_cols:
+        has_payload = final_df[payload_cols].notna().any(axis=1)
+        final_df = final_df[has_payload].reset_index(drop=True)
+
     return final_df
 
 
@@ -300,7 +333,13 @@ def _build_final_df(messages_df: pd.DataFrame) -> pd.DataFrame:
 # PUBLIC API
 # ══════════════════════════════════════════════════════════════════════════════
 
-def decode_asterix(raw_bytes: bytes) -> pd.DataFrame:
+def decode_asterix(
+    raw_bytes: bytes,
+    *,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    workers: int | None = None,
+    batch_size: int | None = None,
+) -> pd.DataFrame:
     """
     Full decoding pipeline: binary → DataFrame.
 
@@ -317,29 +356,71 @@ def decode_asterix(raw_bytes: bytes) -> pd.DataFrame:
     if len(raw_bytes) < 3:
         raise ValueError("File is too short to contain a valid ASTERIX header.")
 
+    _emit_progress(
+        progress_callback,
+        stage="Reading file .ast",
+        current=0,
+        total=100,
+        percent=0.0,
+    )
+
     # Step 1: split binary into message blocks
     messages_df = _split_messages(raw_bytes)
     print(f"[Decoder] Messages found: {len(messages_df):,}")
 
-    # Step 2: parse FSPEC for each message
-    records = messages_df["data_record"].tolist()
-    parsed = list(map(_parse_fspec, records))
-    messages_df = messages_df.assign(
-        frns=[p[0] for p in parsed],
-        data_fields=[p[1] for p in parsed],
+    _emit_progress(
+        progress_callback,
+        stage="Splitting messages",
+        current=len(messages_df),
+        total=len(messages_df) or 1,
+        percent=10.0,
+    )
+
+    # Step 2: parse FSPEC and build decode specs in a single pass
+    message_specs: list[tuple[int, int, list[int], bytes]] = []
+    for index, row in enumerate(messages_df[["cat", "data_record"]].itertuples(index=False)):
+        frns, data_fields = _parse_fspec(row.data_record)
+        message_specs.append((index, int(row.cat), frns, data_fields))
+
+    _emit_progress(
+        progress_callback,
+        stage="Reading FSPEC",
+        current=len(message_specs),
+        total=len(message_specs) or 1,
+        percent=15.0,
     )
 
     # Step 3: ensure UAP decoders are ready (cached after first call)
-    frn_map = _ensure_uap_ready()
+    _ensure_uap_ready()
+
+    _emit_progress(
+        progress_callback,
+        stage="Preparing decoders",
+        current=len(messages_df),
+        total=len(messages_df) or 1,
+        percent=20.0,
+    )
 
     # Step 4: decode every message
-    messages_df["data"] = [
-        _decode_message(r.cat, r.frns, r.data_fields, frn_map)
-        for r in messages_df.itertuples(index=False)
-    ]
+    decoded_rows = decode_messages(
+        message_specs,
+        _decode_message,
+        _ensure_uap_ready,
+        progress_callback=progress_callback,
+        workers=workers,
+        batch_size=batch_size,
+    )
+    messages_df["data"] = decoded_rows
 
     # Step 5: build final table + apply default filters
     final_df = _build_final_df(messages_df)
+    _emit_progress(
+        progress_callback,
+        stage="Finalizing table",
+        current=len(final_df),
+        total=len(final_df) or 1,
+        percent=100.0,
+    )
     print(f"[Decoder] Final records: {len(final_df):,}")
 
     return final_df
