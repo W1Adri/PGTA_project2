@@ -253,10 +253,19 @@
     <div class="view-panel" data-view="map" id="map-panel">
       <div id="map"></div>
 
-      <div class="map-info-box" id="map-info-box">
-        <div class="info-row"><span>Messages</span><span class="info-val" data-info="count">—</span></div>
-        <div class="info-row"><span>Start</span><span class="info-val" data-info="t-start">—</span></div>
-        <div class="info-row"><span>End</span><span class="info-val" data-info="t-end">—</span></div>
+      <div class="map-legend-box" id="map-legend-box" aria-live="polite"></div>
+
+      <div class="map-player" id="map-player">
+        <div class="map-player-shell">
+          <div class="map-player-actions">
+            <button type="button" class="map-player-btn primary" id="map-player-toggle" title="Play" aria-label="Play" disabled>▶</button>
+            <button type="button" class="map-player-btn map-player-speed" id="map-player-speed" title="Playback speed" aria-label="Playback speed" disabled>x1</button>
+            <div class="map-player-time" id="map-player-time">--:--:--</div>
+          </div>
+          <div class="map-player-track-wrap">
+            <input type="range" id="map-player-range" min="0" max="0" value="0" step="1" disabled>
+          </div>
+        </div>
       </div>
 
       <!-- empty state removed — map is always visible -->

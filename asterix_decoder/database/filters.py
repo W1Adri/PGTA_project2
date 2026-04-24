@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
 
@@ -362,8 +363,14 @@ class AsterixFilters:
         if value is None:
             return None
 
+        try:
+            if pd.isna(value):
+                return None
+        except Exception:
+            pass
+
         if isinstance(value, (int, float)):
-            return float(value)
+            return float(math.ceil(value))
 
         text = str(value).strip()
         if not text:
@@ -379,7 +386,8 @@ class AsterixFilters:
                 return float(hour * 3600 + minute * 60 + second)
 
         try:
-            return float(text)
+            numeric = float(text)
+            return float(math.ceil(numeric))
         except ValueError:
             pass
 
@@ -387,7 +395,8 @@ class AsterixFilters:
         if pd.isna(parsed):
             return None
 
-        return float(parsed.timestamp())
+        timestamp = float(parsed.timestamp())
+        return float(math.ceil(timestamp))
 
     def _clean_filters(self, filters: dict[str, Any]) -> dict[str, Any]:
         cleaned: dict[str, Any] = {}

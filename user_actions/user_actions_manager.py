@@ -34,6 +34,9 @@ class Actions:
         elif action == "get_table_window":
             await self.action_get_table_window(websocket, data)
 
+        elif action == "get_map_window":
+            await self.action_get_map_window(websocket, data)
+
         # ── TODO: register new actions here ──────────────────────────────────
         # elif action == "your_new_action":
         #     await self.action_your_new_action(websocket, data)
@@ -201,6 +204,53 @@ class Actions:
 
         await self._send(websocket, {
             "type": "table_window_result",
+            "status": "ok",
+            "data": {
+                "request_id": request_id,
+                **result,
+            },
+        })
+
+    async def action_get_map_window(
+        self,
+        websocket: WebSocketServerProtocol,
+        data: dict,
+    ) -> None:
+        """
+        Return a time-based window of the filtered dataset for the map player.
+
+        Request:
+          {
+            "action": "get_map_window",
+            "current_time": 12345,         // required, seconds or parseable time
+            "window_before": 20,           // optional, seconds before current_time
+            "window_after": 20,            // optional, seconds after current_time
+            "max_points": 2000,            // optional cap for frontend rendering
+            "request_id": "..."           // optional client correlation id
+          }
+
+        Response:
+          {
+            "type": "map_window_result",
+            "status": "ok",
+            "data": { "request_id": "...", "records": [ ... ] }
+          }
+        """
+        request_id = data.get("request_id")
+        current_time = data.get("current_time")
+        window_before = int(data.get("window_before", 20))
+        window_after = int(data.get("window_after", 20))
+        max_points = int(data.get("max_points", 2000))
+
+        result = self.store.get_map_window(
+            current_time=current_time,
+            window_before=window_before,
+            window_after=window_after,
+            max_points=max_points,
+        )
+
+        await self._send(websocket, {
+            "type": "map_window_result",
             "status": "ok",
             "data": {
                 "request_id": request_id,

@@ -8,6 +8,8 @@ produces (e.g. CAT, SAC, SIC, TIME, LAT, LON, FL, TARGET_IDENTIFICATION …).
 """
 
 import io
+import math
+import re
 import threading
 from typing import Any
 
@@ -56,6 +58,52 @@ class AsterixPandas:
         m = (sec % 3600) // 60
         s = sec % 60
         return f"{h:02d}:{m:02d}:{s:02d}"
+
+    @staticmethod
+    def _time_bucket_and_millis(value: Any) -> tuple[float | None, int | None]:
+        """Parse a time-like value into (ceil-second bucket, milliseconds)."""
+        if value is None:
+            return None, None
+
+        try:
+            if pd.isna(value):
+                return None, None
+        except Exception:
+            pass
+
+        text = str(value).strip()
+        if not text or text.lower() in {"nan", "none", "null"}:
+            return None, None
+
+        match = re.match(r"^(\d{1,2}):(\d{2})(?::(\d{2}))?(?::(\d{1,3}))?$", text)
+        if match:
+            hour = int(match.group(1))
+            minute = int(match.group(2))
+            second = int(match.group(3) or 0)
+            ms_text = match.group(4) or "0"
+            millis = int(ms_text.ljust(3, "0")[:3])
+            total = (hour * 3600) + (minute * 60) + second + (millis / 1000.0)
+            return float(math.ceil(total)), millis
+
+        try:
+            numeric = float(text)
+            if math.isfinite(numeric):
+                frac = numeric - math.floor(numeric)
+                millis = int(round(frac * 1000))
+                millis = max(0, min(999, millis))
+                return float(math.ceil(numeric)), millis
+        except Exception:
+            pass
+
+        parsed = pd.to_datetime(text, errors="coerce", utc=True)
+        if pd.isna(parsed):
+            return None, None
+
+        timestamp = float(parsed.timestamp())
+        frac = timestamp - math.floor(timestamp)
+        millis = int(round(frac * 1000))
+        millis = max(0, min(999, millis))
+        return float(math.ceil(timestamp)), millis
 
     def apply_temporary_filters(self, **filters: Any) -> dict[str, Any]:
         """Rebuild the temporary filtered DataFrame from the original DataFrame."""
@@ -173,6 +221,144 @@ class AsterixPandas:
                 "window_end": window_end,
             }
 
+    def get_map_window(
+        self,
+        current_time: Any,
+        *,
+        window_before: int = 20,
+        window_after: int = 20,
+        max_points: int = 2000,
+    ) -> dict[str, Any]:
+        """Return the filtered records around a time cursor for the map player."""
+        with self._lock:
+            df = self._current_df()
+            if df.empty:
+                return {
+                    "records": [],
+                    "count": 0,
+                    "center_seconds": None,
+                    "window_start_seconds": None,
+                    "window_end_seconds": None,
+                }
+
+            time_col = self._col_from(df, "TIME", "timestamp")
+            lat_col = self._col_from(df, "LAT", "latitude")
+            lon_col = self._col_from(df, "LON", "longitude")
+            if not time_col or not lat_col or not lon_col:
+                return {
+                    "records": [],
+                    "count": 0,
+                    "center_seconds": None,
+                    "window_start_seconds": None,
+                    "window_end_seconds": None,
+                }
+
+            center_seconds = AsterixFilters._parse_time_filter_value(current_time)
+            if center_seconds is None:
+                return {
+                    "records": [],
+                    "count": 0,
+                    "center_seconds": None,
+                    "window_start_seconds": None,
+                    "window_end_seconds": None,
+                }
+
+            before = max(0, int(window_before))
+            after = max(0, int(window_after))
+            lower_bound = float(center_seconds) - before
+            upper_bound = float(center_seconds) + after
+
+            time_series = pd.to_numeric(
+                df[time_col].map(AsterixFilters._parse_time_filter_value),
+                errors="coerce",
+            )
+            position_mask = df[lat_col].notna() & df[lon_col].notna()
+            window_mask = time_series.between(lower_bound, upper_bound) & position_mask
+
+            window_df = df.loc[window_mask].copy()
+            if window_df.empty:
+                return {
+                    "records": [],
+                    "count": 0,
+                    "center_seconds": float(center_seconds),
+                    "window_start_seconds": float(lower_bound),
+                    "window_end_seconds": float(upper_bound),
+                }
+
+            window_time_series = pd.to_numeric(
+                window_df[time_col].map(AsterixFilters._parse_time_filter_value),
+                errors="coerce",
+            )
+            window_df["__row_id"] = window_df.index.astype(int)
+            window_df["__time_seconds"] = window_time_series
+
+            parsed_time_parts = window_df[time_col].map(self._time_bucket_and_millis)
+            window_df["__time_bucket"] = pd.to_numeric(
+                parsed_time_parts.map(lambda value: value[0] if isinstance(value, tuple) else None),
+                errors="coerce",
+            )
+            window_df["__time_millis"] = pd.to_numeric(
+                parsed_time_parts.map(lambda value: value[1] if isinstance(value, tuple) else None),
+                errors="coerce",
+            ).fillna(-1).astype(int)
+
+            target_col = self._col_from(window_df, "TARGET_IDENTIFICATION", "target_identification")
+            heading_col = self._col_from(window_df, "HEADING", "heading")
+            if target_col:
+                window_df["__target_id"] = window_df[target_col].astype(str).str.strip().str.upper()
+                dedupe_mask = (
+                    window_df["__target_id"].notna()
+                    & window_df["__target_id"].ne("")
+                    & window_df["__target_id"].ne("NAN")
+                    & window_df["__time_bucket"].notna()
+                )
+
+                if dedupe_mask.any():
+                    deduped_rows: list[pd.Series] = []
+                    grouped_duplicates = window_df.loc[dedupe_mask].sort_values(
+                        by=["__target_id", "__time_bucket", "__time_millis", "__row_id"],
+                        ascending=[True, True, True, True],
+                    ).groupby(["__target_id", "__time_bucket"], sort=False)
+
+                    for _, group in grouped_duplicates:
+                        winner = group.iloc[-1].copy()
+                        if heading_col and pd.isna(winner.get(heading_col)):
+                            heading_candidates = group[group[heading_col].notna()]
+                            if not heading_candidates.empty:
+                                winner[heading_col] = heading_candidates.iloc[-1][heading_col]
+                        deduped_rows.append(winner)
+
+                    deduped = pd.DataFrame(deduped_rows)
+                    window_df = pd.concat([window_df.loc[~dedupe_mask], deduped], axis=0)
+
+            window_df = window_df.sort_values(by=["__time_seconds", "__row_id"], ascending=[True, True])
+
+            if max_points > 0 and len(window_df) > max_points:
+                center_index = window_df["__time_seconds"].sub(float(center_seconds)).abs().idxmin()
+                if center_index in window_df.index:
+                    center_pos = window_df.index.get_loc(center_index)
+                else:
+                    center_pos = len(window_df) // 2
+                half = max_points // 2
+                start = max(0, center_pos - half)
+                end = min(len(window_df), start + max_points)
+                start = max(0, end - max_points)
+                window_df = window_df.iloc[start:end]
+
+            records = (
+                window_df.astype(object)
+                .where(pd.notna(window_df), None)
+                .to_dict(orient="records")
+            )
+
+            return {
+                "records": records,
+                "count": len(records),
+                "center_seconds": float(center_seconds),
+                "window_start_seconds": float(lower_bound),
+                "window_end_seconds": float(upper_bound),
+            }
+
     def get_all(self) -> list[dict]:
         """Return every record (no filters)."""
         with self._lock:
@@ -193,6 +379,10 @@ class AsterixPandas:
                     "columns":           [],
                     "time_start":        None,
                     "time_end":          None,
+                    "lat_min":           None,
+                    "lat_max":           None,
+                    "lon_min":           None,
+                    "lon_max":           None,
                     "unique_callsigns":  [],
                     "unique_categories": [],
                     "unique_squawks":    [],
@@ -268,6 +458,29 @@ class AsterixPandas:
             else:
                 meta["altitude_min"] = None
                 meta["altitude_max"] = None
+
+            # Global map bounds (all loaded points)
+            lat_col = self._col_from(base_df, "LAT", "latitude")
+            lon_col = self._col_from(base_df, "LON", "longitude")
+            if lat_col and lon_col:
+                lat = pd.to_numeric(base_df[lat_col], errors="coerce")
+                lon = pd.to_numeric(base_df[lon_col], errors="coerce")
+                mask = lat.notna() & lon.notna()
+                if mask.any():
+                    meta["lat_min"] = float(lat[mask].min())
+                    meta["lat_max"] = float(lat[mask].max())
+                    meta["lon_min"] = float(lon[mask].min())
+                    meta["lon_max"] = float(lon[mask].max())
+                else:
+                    meta["lat_min"] = None
+                    meta["lat_max"] = None
+                    meta["lon_min"] = None
+                    meta["lon_max"] = None
+            else:
+                meta["lat_min"] = None
+                meta["lat_max"] = None
+                meta["lon_min"] = None
+                meta["lon_max"] = None
 
             return meta
 
