@@ -4,8 +4,8 @@
 
 const AppMap = (() => {
 
-  const DEFAULT_CENTER = [41.297, 2.078];
-  const DEFAULT_ZOOM = 8;
+  const DEFAULT_CENTER = [41.3851, 2.1734]; // Barcelona city center
+  const DEFAULT_ZOOM = 10;
   const REQUEST_DEBOUNCE_MS = 90;
   const MIN_REQUEST_DEBOUNCE_MS = 35;
   const PLAYBACK_TICK_MS = 1000;
@@ -82,7 +82,10 @@ const AppMap = (() => {
     updatePlayerDisplay();
     updateInfoBox({ record_count: 0, time_start: null, time_end: null });
 
-    setTimeout(() => leaflet.invalidateSize(), 80);
+    setTimeout(() => {
+      leaflet.invalidateSize();
+      leaflet.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+    }, 80);
     console.log("[Map] Leaflet initialised.");
   }
 
