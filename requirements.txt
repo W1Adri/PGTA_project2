@@ -20,3 +20,9 @@ websockets
 pywebview[qt]
 pyinstaller
 pythonnet; sys_platform == 'win32'
+bottle
+cffi
+openpyxl
+PyQt6
+PyQt6-WebEngine
+QtPy

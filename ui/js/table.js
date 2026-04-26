@@ -237,7 +237,7 @@ const Table = (() => {
     const dataColumnDefs = columns.map(col => ({
       field: col,
       headerName: col,
-      sortable: true,
+      sortable: false,
       filter: false, // We use sidebar filtering
       minWidth: 120,
       resizable: true,
@@ -267,6 +267,7 @@ const Table = (() => {
       defaultColDef: {
         flex: 1, // Automatically expand columns to fit width
         minWidth: 100,
+        sortable: false,
         cellStyle: { textAlign: "center" },
         headerClass: "table-header-centered"
       }
