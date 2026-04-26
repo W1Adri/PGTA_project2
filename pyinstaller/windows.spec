@@ -71,6 +71,9 @@ all_hidden = (
     + collect_submodules('fastapi')
     + collect_submodules('websockets')
     + collect_submodules('multipart')
+    + collect_submodules('asterix_decoder.data_items')
+    + collect_submodules('asterix_decoder.data_items.CAT021')
+    + collect_submodules('asterix_decoder.data_items.CAT048')
     + [
         'multipart',
         'multipart.multiparser',

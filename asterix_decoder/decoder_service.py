@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import inspect
+import pkgutil
 from pathlib import Path
 from typing import Any, Callable
 
@@ -109,17 +110,15 @@ def _discover_item_classes(
         if not folder.exists():
             continue
 
-        for file in folder.glob("*.py"):
-            if file.name == "__init__.py":
-                continue
+        package_name = f"asterix_decoder.data_items.CAT{cat:03d}"
 
-            module_name = f"dyn_cat{cat:03d}_{file.stem}"
-            spec = importlib.util.spec_from_file_location(module_name, file)
-            if spec is None or spec.loader is None:
-                continue
+        for module_info in pkgutil.iter_modules([str(folder)]):
+            module_name = f"{package_name}.{module_info.name}"
 
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
+            try:
+                module = importlib.import_module(module_name)
+            except Exception:
+                continue
 
             for _, cls in inspect.getmembers(module, inspect.isclass):
                 if (
