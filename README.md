@@ -166,7 +166,9 @@ Why WebSocket here:
 4. Frontend asks windows and filtered views over WebSocket (`get_table_window`, `get_map_window`, `apply_filters`).
 5. Export is done over API (`GET /download/csv`).
 
-# ABuild Guide
+
+
+# Build Guide
 
 This document explains how to produce a standalone executable from the project,
 either locally on your own machine or automatically via GitHub Actions.
