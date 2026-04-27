@@ -13,6 +13,10 @@ const AppMap = (() => {
   const DEFAULT_WINDOW_SECONDS = 12;
   const MAX_RENDERED_POINTS = 500;
   const PRUNE_MARGIN_SECONDS = 45;
+  const REQUEST_TIMEOUT_MS = 12000;
+  const HTTP_REQUEST_TIMEOUT_MS = 12000;
+  const API_BASE = window.location.origin || "http://127.0.0.1:8888";
+  const MAP_DATA_URL = `${API_BASE}/map_data`;
   const MARKER_STALE_SECONDS = 10;
   const UNKNOWN_MARKER_STALE_SECONDS = 3;
   const HIGH_SPEED_TRAIL_MIN_INTERVAL_MS = 220;
@@ -30,6 +34,9 @@ const AppMap = (() => {
   let playbackTimer = null;
   let requestSeq = 0;
   let pendingRequestId = null;
+  let pendingRequestTransport = null;
+  let pendingRequestTimeoutId = null;
+  let currentRequestPayload = null;
   let queuedWindowRequest = false;
   let latestRequestedSeq = 0;
   let lastRenderedRequestSeq = 0;
@@ -378,6 +385,8 @@ const AppMap = (() => {
     hasAdjustedView = false;
     lastTrailRenderAt = 0;
     pendingRequestId = null;
+    pendingRequestTransport = null;
+    currentRequestPayload = null;
     queuedWindowRequest = false;
     latestRequestedSeq = 0;
     lastRenderedRequestSeq = 0;
@@ -390,6 +399,10 @@ const AppMap = (() => {
     if (requestTimer) {
       clearTimeout(requestTimer);
       requestTimer = null;
+    }
+    if (pendingRequestTimeoutId) {
+      clearTimeout(pendingRequestTimeoutId);
+      pendingRequestTimeoutId = null;
     }
 
     markersById.forEach(({ layer }) => {
@@ -437,21 +450,115 @@ const AppMap = (() => {
     }
 
     const requestId = `map_${Date.now()}_${++requestSeq}`;
-    pendingRequestId = requestId;
-    queuedWindowRequest = false;
     latestRequestedSeq = requestSeq;
+    const payload = buildWindowPayload(requestId);
 
-    const sent = WS.send({
+    if (!WS.isConnected()) {
+      requestWindowHttp(payload, "ws-disconnected");
+      return;
+    }
+
+    beginPendingRequest(requestId, "ws", payload, REQUEST_TIMEOUT_MS);
+
+    const sent = WS.send(payload);
+
+    if (!sent) {
+      finishPendingRequest(requestId, { keepQueued: true });
+      requestWindowHttp(payload, "ws-send-failed");
+    }
+  }
+
+  function buildWindowPayload(requestId) {
+    return {
       action: "get_map_window",
       request_id: requestId,
       current_time: state.currentTime,
       window_before: state.windowBefore,
       window_after: state.windowAfter,
       max_points: state.maxPoints,
-    });
+    };
+  }
 
-    if (!sent) {
-      pendingRequestId = null;
+  function beginPendingRequest(requestId, transport, payload, timeoutMs) {
+    if (pendingRequestTimeoutId) clearTimeout(pendingRequestTimeoutId);
+    pendingRequestId = requestId;
+    pendingRequestTransport = transport;
+    currentRequestPayload = payload;
+    queuedWindowRequest = false;
+
+    pendingRequestTimeoutId = setTimeout(() => {
+      const timedOutPayload = currentRequestPayload;
+      const timedOutTransport = pendingRequestTransport;
+      finishPendingRequest(requestId, { keepQueued: true });
+      if (timedOutTransport === "ws") {
+        requestWindowHttp(timedOutPayload, "ws-timeout");
+      }
+    }, timeoutMs);
+  }
+
+  function finishPendingRequest(requestId, { keepQueued = false } = {}) {
+    if (requestId && pendingRequestId && requestId !== pendingRequestId) {
+      return false;
+    }
+
+    if (pendingRequestTimeoutId) {
+      clearTimeout(pendingRequestTimeoutId);
+      pendingRequestTimeoutId = null;
+    }
+
+    const hadQueuedRequest = queuedWindowRequest;
+    pendingRequestId = null;
+    pendingRequestTransport = null;
+    currentRequestPayload = null;
+    if (!keepQueued) queuedWindowRequest = false;
+    return hadQueuedRequest;
+  }
+
+  async function requestWindowHttp(payload, reason) {
+    if (!payload || !datasetReady) return;
+    if (pendingRequestId) {
+      queuedWindowRequest = true;
+      return;
+    }
+
+    beginPendingRequest(payload.request_id, "http", payload, HTTP_REQUEST_TIMEOUT_MS + 1000);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), HTTP_REQUEST_TIMEOUT_MS);
+
+    try {
+      const res = await fetch(MAP_DATA_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_time: payload.current_time,
+          window_before: payload.window_before,
+          window_after: payload.window_after,
+          max_points: payload.max_points,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      data.request_id = payload.request_id;
+
+      const responseSeq = getRequestSeq(payload.request_id);
+      if (responseSeq !== null && responseSeq > lastRenderedRequestSeq) {
+        lastRenderedRequestSeq = responseSeq;
+        renderWindow(data);
+      }
+    } catch (err) {
+      console.warn(`[Map] HTTP fallback failed (${reason}):`, err);
+    } finally {
+      clearTimeout(timeoutId);
+      const shouldRunQueued = finishPendingRequest(payload.request_id);
+      if (shouldRunQueued) {
+        requestWindowNow();
+      }
     }
   }
 
@@ -866,8 +973,21 @@ const AppMap = (() => {
     const data = payload?.data || {};
     const responseSeq = getRequestSeq(data.request_id);
 
+    if (payload?.status && payload.status !== "ok") {
+      const fallbackPayload = currentRequestPayload || buildWindowPayload(data.request_id || `map_${Date.now()}_${++requestSeq}`);
+      finishPendingRequest(data.request_id, { keepQueued: true });
+      requestWindowHttp(fallbackPayload, "ws-error");
+      return;
+    }
+
     // Ignore responses older than the last one we already rendered.
     if (responseSeq !== null && responseSeq <= lastRenderedRequestSeq) {
+      if (pendingRequestId && data.request_id === pendingRequestId) {
+        const shouldRunQueued = finishPendingRequest(data.request_id, { keepQueued: true });
+        if (shouldRunQueued) {
+          requestWindowNow();
+        }
+      }
       return;
     }
 
@@ -875,14 +995,32 @@ const AppMap = (() => {
       lastRenderedRequestSeq = responseSeq;
     }
 
-    if (pendingRequestId && data.request_id === pendingRequestId) {
-      pendingRequestId = null;
-    }
+    const shouldRunQueued = pendingRequestId && data.request_id === pendingRequestId
+      ? finishPendingRequest(data.request_id)
+      : queuedWindowRequest;
 
     renderWindow(data);
 
-    if (queuedWindowRequest) {
+    if (shouldRunQueued) {
       requestWindowNow();
+    }
+  }
+
+  function onWsStatus(evt) {
+    const stateValue = evt?.detail?.state;
+    if (!datasetReady) return;
+
+    if (stateValue === "disconnected") {
+      if (pendingRequestId && pendingRequestTransport === "ws") {
+        const fallbackPayload = currentRequestPayload;
+        finishPendingRequest(pendingRequestId, { keepQueued: true });
+        requestWindowHttp(fallbackPayload, "ws-disconnected");
+      }
+      return;
+    }
+
+    if (stateValue === "connected" && !pendingRequestId) {
+      scheduleWindowRequest();
     }
   }
 
@@ -920,6 +1058,7 @@ const AppMap = (() => {
     window.addEventListener("asterix:loaded", e => onDataLoaded(e.detail));
     window.addEventListener("asterix:filters-applied", onFiltersApplied);
     window.addEventListener("asterix:session-cleared", onSessionCleared);
+    window.addEventListener("asterix:ws-status", onWsStatus);
     WS.on("map_window_result", onMapWindow);
   }
 

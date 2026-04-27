@@ -311,23 +311,52 @@ class Actions:
         window_before = int(data.get("window_before", MAP_DEFAULT_WINDOW_BEFORE_SECONDS))
         window_after = int(data.get("window_after", MAP_DEFAULT_WINDOW_AFTER_SECONDS))
         max_points = int(data.get("max_points", MAP_MAX_POINTS))
+        started_at = time.perf_counter()
 
-        result = await asyncio.to_thread(
-            self.store.get_map_window,
-            current_time=current_time,
-            window_before=window_before,
-            window_after=window_after,
-            max_points=max_points,
+        self._debug_log(
+            "map_window request "
+            f"id={request_id} time={current_time} before={window_before} "
+            f"after={window_after} max_points={max_points}"
         )
 
-        await self._send(websocket, {
-            "type": "map_window_result",
-            "status": "ok",
-            "data": {
-                "request_id": request_id,
-                **result,
-            },
-        })
+        try:
+            result = await asyncio.to_thread(
+                self.store.get_map_window,
+                current_time=current_time,
+                window_before=window_before,
+                window_after=window_after,
+                max_points=max_points,
+            )
+
+            elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+            self._debug_log(
+                "map_window result "
+                f"id={request_id} records={len(result.get('records', []))} "
+                f"elapsed_ms={elapsed_ms}"
+            )
+
+            await self._send(websocket, {
+                "type": "map_window_result",
+                "status": "ok",
+                "data": {
+                    "request_id": request_id,
+                    **result,
+                },
+            })
+        except Exception as exc:
+            elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+            self._debug_log(
+                "map_window error "
+                f"id={request_id} elapsed_ms={elapsed_ms} error={exc}"
+            )
+            await self._send(websocket, {
+                "type": "map_window_result",
+                "status": "error",
+                "data": {
+                    "request_id": request_id,
+                    "detail": str(exc),
+                },
+            })
 
     # ── TODO: add new action handlers below ──────────────────────────────────
     #
@@ -360,5 +389,9 @@ class Actions:
                 separators=(",", ":"),
             )
             await websocket.send(message)
-        except Exception:
+        except Exception as exc:
+            Actions._debug_log(
+                "send error "
+                f"type={payload.get('type')} error={exc}"
+            )
             pass   # client disconnected mid-response — ignore

@@ -20,6 +20,7 @@ const Table = (() => {
   const REQUEST_TIMEOUT_MS = 30000;
   const SEND_RETRY_DELAY_MS = 250;
   const HTTP_REQUEST_TIMEOUT_MS = 20000;
+  const MAX_PENDING_WS_REQUESTS = 1;
   const API_BASE = window.location.origin || "http://127.0.0.1:8888";
   const TABLE_DATA_URL = `${API_BASE}/table_data`;
 
@@ -106,6 +107,10 @@ const Table = (() => {
       requestWindowHttp(params, "ws-disconnected");
       return;
     }
+    if (pendingRequests.size >= MAX_PENDING_WS_REQUESTS) {
+      requestWindowHttp(params, "ws-backpressure");
+      return;
+    }
     const requestId = nextRequestId();
 
     const payload = {
@@ -124,6 +129,7 @@ const Table = (() => {
       endRow,
       payload,
       params,
+      createdAt: Date.now(),
       fallbackUsed: false,
       successCallback: params.successCallback,
       failCallback: params.failCallback,
@@ -155,6 +161,16 @@ const Table = (() => {
     };
 
     trySend();
+  }
+
+  function fallbackPendingRequests(reason) {
+    const pendingItems = [...pendingRequests.entries()];
+    pendingItems.forEach(([requestId, pending]) => {
+      if (pending.timeoutId) clearTimeout(pending.timeoutId);
+      if (pending.retryId) clearTimeout(pending.retryId);
+      pendingRequests.delete(requestId);
+      attemptHttpFallback(pending, reason);
+    });
   }
 
   function onTableWindow(payload) {
@@ -197,6 +213,11 @@ const Table = (() => {
     if (!hasDatasetLoaded) return;
     const detail = payload?.detail || "WebSocket request failed";
     setProcessingFooter(`WebSocket error: ${detail}`);
+  }
+
+  function onWsStatus(evt) {
+    if (evt?.detail?.state !== "disconnected") return;
+    fallbackPendingRequests("ws-disconnected");
   }
 
   function applyWindowData({
@@ -374,6 +395,8 @@ const Table = (() => {
       rowModelType: 'infinite',
       cacheBlockSize: BLOCK_SIZE,
       maxBlocksInCache: 6,
+      maxConcurrentDatasourceRequests: 1,
+      blockLoadDebounceMillis: 120,
       datasource: datasource,
       rowSelection: undefined,
       suppressRowClickSelection: true,
@@ -518,6 +541,7 @@ const Table = (() => {
     // 4. Main table stream channel
     WS.on("table_window_result", onTableWindow);
     WS.on("error", onWsError);
+    window.addEventListener("asterix:ws-status", onWsStatus);
 
     // Keep initial table state clean while no file exists.
     if (gridApi) {

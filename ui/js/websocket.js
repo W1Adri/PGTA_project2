@@ -20,9 +20,13 @@ const WS = (() => {
   const handlers = {};   // action → [callback, ...]
 
   // ── Status helpers ──────────────────────────────────────────────────────────
-  function setStatus(state) {
+  function setStatus(state, detail = {}) {
     const dot   = document.getElementById("ws-dot");
     const label = document.getElementById("ws-label");
+    window.dispatchEvent(new CustomEvent("asterix:ws-status", {
+      detail: { state, ...detail },
+    }));
+
     if (!dot || !label) return;
 
     dot.className   = `status-dot ${state}`;
@@ -44,7 +48,7 @@ const WS = (() => {
 
     socket.addEventListener("close", (evt) => {
       console.warn("[WS] Closed", evt.code, evt.reason);
-      setStatus("disconnected");
+      setStatus("disconnected", { code: evt.code, reason: evt.reason });
       socket = null;
       scheduleReconnect();
     });

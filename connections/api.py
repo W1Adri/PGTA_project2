@@ -3,6 +3,7 @@ import uvicorn
 import os
 import sys
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
@@ -120,7 +121,8 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
         sort_col = body.get("sortCol")
         sort_dir = body.get("sortDir")
         
-        result = store.filter_paginated(
+        result = await run_in_threadpool(
+            store.filter_paginated,
             start_row=start_row,
             end_row=end_row,
             sort_col=sort_col,
@@ -131,6 +133,24 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
             **result,
             "total_count": result.get("count", 0),
         }
+
+    # ── Map Data fallback ────────────────────────────────────────────────────
+    @api.post("/map_data")
+    async def get_map_data(request: Request):
+        """Return a small map window over HTTP when WebSocket is reconnecting."""
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        result = await run_in_threadpool(
+            store.get_map_window,
+            current_time=body.get("current_time"),
+            window_before=body.get("window_before", 12),
+            window_after=body.get("window_after", 0),
+            max_points=body.get("max_points", 500),
+        )
+        return result
 
     # ── Static frontend — MUST be last so API routes take priority ────────────
     api.mount("/", StaticFiles(directory=resource_path("ui"), html=True), name="ui")

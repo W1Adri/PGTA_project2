@@ -38,8 +38,8 @@ async def _handle_connection(
             await _dispatch(raw, websocket, actions)
 
     except websockets.exceptions.ConnectionClosed as exc:
-        print(f"[WS] Closed     — {remote}  ({exc.code})")
-        _debug_ws(f"Closed remote={remote} code={exc.code}")
+        print(f"[WS] Closed     — {remote}  ({exc.code}) {exc.reason}")
+        _debug_ws(f"Closed remote={remote} code={exc.code} reason={exc.reason}")
     except Exception as exc:
         import traceback
         print(f"[WS] Unexpected error from {remote}: {exc}")
@@ -132,7 +132,16 @@ async def _run_server(actions: Actions, port: int) -> None:
     async def handler(ws: WebSocketServerProtocol):
         await _handle_connection(ws, actions)
 
-    async with websockets.serve(handler, "127.0.0.1", port):
+    async with websockets.serve(
+        handler,
+        "127.0.0.1",
+        port,
+        ping_interval=None,
+        max_queue=64,
+        max_size=4 * 1024 * 1024,
+        compression=None,
+        close_timeout=2,
+    ):
         print(f"[WS]    ws://127.0.0.1:{port}")
         _debug_ws(f"Server listening on 127.0.0.1:{port}")
         await asyncio.Future()   # run forever
