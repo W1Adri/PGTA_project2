@@ -24,6 +24,10 @@ const Upload = (() => {
   let progressNodes = new Map();
   let currentStageKey = null;
   let currentStageText = "Waiting to start.";
+  let decodeProgressPercent = 0;
+  let tableReadyTimeoutId = null;
+
+  const TABLE_READY_TIMEOUT_MS = 15000;
 
   // ── Toast helper ─────────────────────────────────────────────────────────────
   function toast(message, type = "info") {
@@ -106,6 +110,12 @@ const Upload = (() => {
     progressNodes = new Map();
     currentStageKey = null;
     currentStageText = "Waiting to start.";
+    decodeProgressPercent = 0;
+
+    if (tableReadyTimeoutId) {
+      clearTimeout(tableReadyTimeoutId);
+      tableReadyTimeoutId = null;
+    }
 
     const { log, stackCount, stage, text, percent, fill, current, stack } = getProgressPanel();
     if (log) log.innerHTML = "";
@@ -235,11 +245,13 @@ const Upload = (() => {
 
     const data = payload?.data || {};
     const { stage, percent, detail } = formatProgress(data);
+    const nextPercent = Math.min(95, Math.max(decodeProgressPercent, percent));
+    decodeProgressPercent = nextPercent;
 
     setFrontStatus(detail);
 
     commitPreviousStage(stage);
-    updateCurrentStage(stage, detail, percent);
+    updateCurrentStage(stage, detail, nextPercent);
 
     window.dispatchEvent(new CustomEvent("asterix:processing-progress", {
       detail: {
@@ -263,22 +275,54 @@ const Upload = (() => {
     setProgressPanel(currentStageText, 0, "Preparing decoder");
   }
 
+  function scheduleTableReadyFallback() {
+    if (tableReadyTimeoutId) clearTimeout(tableReadyTimeoutId);
+
+    tableReadyTimeoutId = setTimeout(() => {
+      tableReadyTimeoutId = null;
+      if (!processingActive) return;
+
+      toast("Table is taking longer than expected. Opening dashboard.", "info");
+      window.dispatchEvent(new CustomEvent("asterix:table-ready", {
+        detail: { success: true, degraded: true },
+      }));
+    }, TABLE_READY_TIMEOUT_MS);
+  }
+
   function finishProcessingUI() {
     processingActive = false;
+    if (tableReadyTimeoutId) {
+      clearTimeout(tableReadyTimeoutId);
+      tableReadyTimeoutId = null;
+    }
     setUploadControlsDisabled(false);
     document.body.classList.remove("uploading");
     hideProgressPanel();
   }
 
-  function onTableReady() {
+  function onTableReady(evt) {
     if (!processingActive) return;
 
-    finishCurrentStage("Loading tables complete. Dashboard ready.");
-    setFrontStatus("File processed successfully. Opening dashboard...");
+    const degraded = !!evt?.detail?.degraded;
+
+    if (tableReadyTimeoutId) {
+      clearTimeout(tableReadyTimeoutId);
+      tableReadyTimeoutId = null;
+    }
+
+    if (degraded) {
+      finishCurrentStage("File decoded. Table is still loading in background.");
+      setFrontStatus("File processed. Table is still loading in background.");
+      setProgressPanel("File decoded. Table is still loading in background.", 100, "Ready");
+    } else {
+      finishCurrentStage("Loading tables complete. Dashboard ready.");
+      setFrontStatus("File processed successfully. Opening dashboard...");
+      setProgressPanel("Loading tables complete. Dashboard ready.", 100, "Ready");
+    }
+
     setDownloadDisabled(false);
     fileLoaded = true;
     setHeaderUploadMode("exit");
-    setProgressPanel("Loading tables complete. Dashboard ready.", 100, "Ready");
     finishProcessingUI();
   }
 
@@ -359,7 +403,8 @@ const Upload = (() => {
       setFrontStatus("Loading tables...");
       currentStageKey = "Loading tables";
       currentStageText = "Loading tables...";
-      setProgressPanel("Loading tables...", 95, "Loading tables");
+      setProgressPanel("Loading tables...", Math.max(96, decodeProgressPercent), "Loading tables");
+      scheduleTableReadyFallback();
 
     } catch (err) {
       console.error("[Upload] Error:", err);
