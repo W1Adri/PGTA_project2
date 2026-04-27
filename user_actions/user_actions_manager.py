@@ -21,10 +21,24 @@ class Actions:
             return
 
         try:
-            log_path = os.path.join(tempfile.gettempdir(), "asterix_decoder_debug.log")
+            forced_dir = os.environ.get("ASTERIX_DEBUG_LOG_DIR")
+            if forced_dir:
+                base_dir = forced_dir
+            elif getattr(sys, "frozen", False):
+                base_dir = os.path.dirname(os.path.abspath(sys.executable))
+            else:
+                base_dir = tempfile.gettempdir()
+
+            log_path = os.path.join(base_dir, "asterix_decoder_debug.log")
             timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-            with open(log_path, "a", encoding="utf-8") as f:
-                f.write(f"[{timestamp}] {message}\n")
+            try:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(f"[{timestamp}] {message}\n")
+            except OSError:
+                # Fallback if executable directory is read-only.
+                fallback_path = os.path.join(tempfile.gettempdir(), "asterix_decoder_debug.log")
+                with open(fallback_path, "a", encoding="utf-8") as f:
+                    f.write(f"[{timestamp}] {message}\n")
         except Exception:
             pass
 
