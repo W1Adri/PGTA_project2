@@ -424,6 +424,20 @@ def decode_asterix(
 
     # Step 5: build final table + apply default filters
     final_df = _build_final_df(messages_df)
+
+    if len(messages_df) > 0 and len(final_df) == 0:
+        decoded_payload_rows = 0
+        for payload in decoded_rows:
+            if isinstance(payload, dict) and len(payload) > 0:
+                decoded_payload_rows += 1
+
+        if decoded_payload_rows == 0:
+            raise RuntimeError(
+                "No message payload could be decoded. "
+                "This usually means ASTERIX item decoder modules were not loaded "
+                "in the packaged build (check PyInstaller hiddenimports)."
+            )
+
     _emit_progress(
         progress_callback,
         stage="Finalizing table",
