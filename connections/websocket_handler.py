@@ -10,6 +10,15 @@ from user_actions.user_actions_manager import Actions
 
 _SERVER_LOOP: asyncio.AbstractEventLoop | None = None
 _CLIENTS: set[WebSocketServerProtocol] = set()
+_LAST_BROADCAST_DROP: str | None = None
+
+
+def _debug_ws(message: str) -> None:
+    Actions._debug_log(f"[WS] {message}")
+
+
+def _make_broadcast_drop_key(reason: str, payload_type: Any) -> str:
+    return f"{reason}:{payload_type}"
 
 
 # ── Per-connection handler ────────────────────────────────────────────────────
@@ -22,6 +31,7 @@ async def _handle_connection(
     _CLIENTS.add(websocket)
     remote = websocket.remote_address
     print(f"[WS] Connected  — {remote}")
+    _debug_ws(f"Connected remote={remote}")
 
     try:
         async for raw in websocket:
@@ -29,6 +39,7 @@ async def _handle_connection(
 
     except websockets.exceptions.ConnectionClosed as exc:
         print(f"[WS] Closed     — {remote}  ({exc.code})")
+        _debug_ws(f"Closed remote={remote} code={exc.code}")
     except Exception as exc:
         import traceback
         print(f"[WS] Unexpected error from {remote}: {exc}")
@@ -36,6 +47,7 @@ async def _handle_connection(
     finally:
         _CLIENTS.discard(websocket)
         print(f"[WS] Disconnected — {remote}")
+        _debug_ws(f"Disconnected remote={remote}")
 
 
 async def _dispatch(
@@ -88,7 +100,19 @@ async def _broadcast(payload: dict[str, Any]) -> None:
 
 def broadcast_message(payload: dict[str, Any]) -> None:
     """Thread-safe broadcast helper for progress updates and alerts."""
+    global _LAST_BROADCAST_DROP
     if _SERVER_LOOP is None or _SERVER_LOOP.is_closed():
+        drop_key = _make_broadcast_drop_key("no_loop", payload.get("type"))
+        if drop_key != _LAST_BROADCAST_DROP:
+            _LAST_BROADCAST_DROP = drop_key
+            _debug_ws(f"Broadcast skipped (no loop) type={payload.get('type')}")
+        return
+
+    if not _CLIENTS:
+        drop_key = _make_broadcast_drop_key("no_clients", payload.get("type"))
+        if drop_key != _LAST_BROADCAST_DROP:
+            _LAST_BROADCAST_DROP = drop_key
+            _debug_ws(f"Broadcast skipped (no clients) type={payload.get('type')}")
         return
 
     try:
@@ -110,6 +134,7 @@ async def _run_server(actions: Actions, port: int) -> None:
 
     async with websockets.serve(handler, "127.0.0.1", port):
         print(f"[WS]    ws://127.0.0.1:{port}")
+        _debug_ws(f"Server listening on 127.0.0.1:{port}")
         await asyncio.Future()   # run forever
 
 

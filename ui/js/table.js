@@ -19,6 +19,9 @@ const Table = (() => {
   const RETAIN_MARGIN = 1000;
   const REQUEST_TIMEOUT_MS = 30000;
   const SEND_RETRY_DELAY_MS = 250;
+  const HTTP_REQUEST_TIMEOUT_MS = 20000;
+  const API_BASE = window.location.origin || "http://127.0.0.1:8888";
+  const TABLE_DATA_URL = `${API_BASE}/table_data`;
 
   function nextRequestId() {
     requestSeq += 1;
@@ -99,6 +102,10 @@ const Table = (() => {
     const startRow = params.startRow;
     const endRow = params.endRow;
     const { sortCol, sortDir } = getSortFromParams(params);
+    if (!WS.isConnected()) {
+      requestWindowHttp(params, "ws-disconnected");
+      return;
+    }
     const requestId = nextRequestId();
 
     const payload = {
@@ -116,6 +123,8 @@ const Table = (() => {
       startRow,
       endRow,
       payload,
+      params,
+      fallbackUsed: false,
       successCallback: params.successCallback,
       failCallback: params.failCallback,
       timeoutId: setTimeout(() => {
@@ -123,6 +132,9 @@ const Table = (() => {
         if (!stale) return;
         if (stale.retryId) clearTimeout(stale.retryId);
         pendingRequests.delete(requestId);
+        if (attemptHttpFallback(stale, "timeout")) {
+          return;
+        }
         stale.failCallback();
         if (gridApi) {
           gridApi.setGridOption("loading", false);
@@ -158,6 +170,9 @@ const Table = (() => {
     if (pending.generation !== cacheGeneration) return;
 
     if (payload?.status && payload.status !== "ok") {
+      if (attemptHttpFallback(pending, "ws-error")) {
+        return;
+      }
       pending.failCallback();
       if (gridApi) {
         gridApi.setGridOption("loading", false);
@@ -167,15 +182,39 @@ const Table = (() => {
       return;
     }
 
-    const windowStart = data.window_start || 0;
-    const records = data.records || [];
-    const totalCount = data.total_count || 0;
+    applyWindowData({
+      startRow: pending.startRow,
+      endRow: pending.endRow,
+      windowStart: data.window_start || 0,
+      records: data.records || [],
+      totalCount: data.total_count || 0,
+      successCallback: pending.successCallback,
+      failCallback: pending.failCallback,
+    });
+  }
+
+  function onWsError(payload) {
+    if (!hasDatasetLoaded) return;
+    const detail = payload?.detail || "WebSocket request failed";
+    setProcessingFooter(`WebSocket error: ${detail}`);
+  }
+
+  function applyWindowData({
+    startRow,
+    endRow,
+    windowStart,
+    records,
+    totalCount,
+    successCallback,
+    failCallback,
+  }) {
     lastKnownTotalCount = totalCount;
 
     if (totalCount === 0) {
-      pending.successCallback([], 0);
+      successCallback([], 0);
       updateFooter(0, false);
       if (gridApi) gridApi.setGridOption("loading", false);
+      dispatchTableReady();
       return;
     }
 
@@ -183,16 +222,16 @@ const Table = (() => {
       rowCache.set(windowStart + offset, row);
     });
 
-    pruneCache(pending.startRow, pending.endRow);
+    pruneCache(startRow, endRow);
 
-    if (!hasCachedRange(pending.startRow, pending.endRow)) {
-      pending.failCallback();
+    if (!hasCachedRange(startRow, endRow)) {
+      failCallback();
       if (gridApi) gridApi.setGridOption("loading", false);
       return;
     }
 
-    const rows = buildRowsFromCache(pending.startRow, pending.endRow);
-    pending.successCallback(rows, totalCount);
+    const rows = buildRowsFromCache(startRow, endRow);
+    successCallback(rows, totalCount);
 
     updateFooter(totalCount, false);
     if (gridApi) gridApi.setGridOption("loading", false);
@@ -200,10 +239,66 @@ const Table = (() => {
     dispatchTableReady();
   }
 
-  function onWsError(payload) {
-    if (!hasDatasetLoaded) return;
-    const detail = payload?.detail || "WebSocket request failed";
-    setProcessingFooter(`WebSocket error: ${detail}`);
+  function resolveHttpRange(startRow, endRow) {
+    const safeStart = Math.max(0, startRow - WINDOW_MARGIN);
+    const safeEnd = Math.max(safeStart + BLOCK_SIZE, endRow + WINDOW_MARGIN, endRow);
+    return { startRow: safeStart, endRow: safeEnd };
+  }
+
+  async function requestWindowHttp(params, reason) {
+    const { sortCol, sortDir } = getSortFromParams(params);
+    const range = resolveHttpRange(params.startRow, params.endRow);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), HTTP_REQUEST_TIMEOUT_MS);
+
+    try {
+      const res = await fetch(TABLE_DATA_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startRow: range.startRow,
+          endRow: range.endRow,
+          sortCol,
+          sortDir,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const totalCount = data.count ?? data.total_count ?? 0;
+      applyWindowData({
+        startRow: params.startRow,
+        endRow: params.endRow,
+        windowStart: range.startRow,
+        records: data.records || [],
+        totalCount,
+        successCallback: params.successCallback,
+        failCallback: params.failCallback,
+      });
+    } catch (err) {
+      console.warn(`[Table] HTTP fallback failed (${reason}):`, err);
+      params.failCallback();
+      if (gridApi) {
+        gridApi.setGridOption("loading", false);
+        setProcessingFooter("Table request failed. Check backend connection.");
+        gridApi.showNoRowsOverlay();
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  function attemptHttpFallback(pending, reason) {
+    if (!pending || pending.fallbackUsed) return false;
+    pending.fallbackUsed = true;
+    if (pending.retryId) clearTimeout(pending.retryId);
+    if (pending.timeoutId) clearTimeout(pending.timeoutId);
+    requestWindowHttp(pending.params, reason);
+    return true;
   }
 
   // ── AG Grid Datasource ──────────────────────────────────────────────────

@@ -47,12 +47,27 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
         if not raw_bytes:
             raise HTTPException(status_code=400, detail="File is empty.")
 
+        actions._debug_log(
+            f"upload start filename={file.filename} size={len(raw_bytes)}"
+        )
+
+        last_stage: str | None = None
+
         def report_progress(detail: dict) -> None:
+            nonlocal last_stage
             broadcast_message({
                 "type": "decode_progress",
                 "status": "ok",
                 "data": detail,
             })
+            stage = detail.get("stage")
+            if stage and stage != last_stage:
+                last_stage = stage
+                actions._debug_log(
+                    "decode_progress "
+                    f"stage={stage} percent={detail.get('percent')} "
+                    f"current={detail.get('current')}/{detail.get('total')}"
+                )
 
         try:
             from asterix_decoder.decoder_service import decode_asterix
@@ -61,8 +76,14 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
             store.clear()
             df = decode_asterix(raw_bytes, progress_callback=report_progress)
             store.load_dataframe(df)
+            meta = store.get_metadata()
+            actions._debug_log(
+                "upload complete "
+                f"records={meta.get('record_count')} "
+                f"columns={len(meta.get('columns', []))}"
+            )
 
-            return store.get_metadata()
+            return meta
 
         except Exception as exc:
             import traceback
@@ -105,7 +126,10 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
             sort_col=sort_col,
             sort_dir=sort_dir,
         )
-        return result
+        return {
+            **result,
+            "total_count": result.get("count", 0),
+        }
 
     # ── Static frontend — MUST be last so API routes take priority ────────────
     api.mount("/", StaticFiles(directory=resource_path("ui"), html=True), name="ui")
