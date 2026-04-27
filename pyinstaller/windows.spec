@@ -5,6 +5,19 @@ import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(SPEC)))
 block_cipher = None
 
+def collect_item_hiddenimports(root):
+    modules = []
+    items_root = os.path.join(root, 'asterix_decoder', 'data_items')
+    for current_root, _, filenames in os.walk(items_root):
+        for filename in filenames:
+            if not (filename.startswith('item_') and filename.endswith('.py')):
+                continue
+            source_path = os.path.join(current_root, filename)
+            relative = os.path.relpath(source_path, root)
+            module_name = relative[:-3].replace(os.sep, '.')
+            modules.append(module_name)
+    return sorted(set(modules))
+
 def safe_collect(package):
     try:
         d, b, h = collect_all(package)
@@ -32,6 +45,7 @@ mp_d, mp_b, mp_h = safe_collect('multipart')       # python-multipart
 # python-multipart: collect both possible module names + metadata
 mp_d, mp_b, mp_h = safe_collect('multipart')
 mp2_d, mp2_b, mp2_h = safe_collect('python_multipart')
+item_hiddenimports = collect_item_hiddenimports(ROOT)
 
 # copy_metadata is required so FastAPI's runtime check finds the package
 multipart_meta = (
@@ -54,12 +68,9 @@ all_hidden = (
     + collect_submodules('fastapi')
     + collect_submodules('websockets')
     + collect_submodules('multipart')
-    + collect_submodules('asterix_decoder.data_items')
-    + collect_submodules('asterix_decoder.data_items.CAT021')
-    + collect_submodules('asterix_decoder.data_items.CAT048')
+    + item_hiddenimports
     + [
         'multipart',
-        'multipart.multiparser',
         'multipart.exceptions',
         'webview.platforms.winforms',
         'webview.platforms.edgechromium',

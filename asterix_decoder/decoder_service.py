@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib
 import inspect
-import pkgutil
 from typing import Any, Callable
 
 import pandas as pd
@@ -94,39 +93,52 @@ def _parse_fspec(data_record: bytes) -> tuple[list[int], bytes]:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _discover_item_classes(
-    cats: list[int],
+    uap_df: pd.DataFrame,
 ) -> dict[tuple[int, str], type]:
-    """Map (cat, item_id) -> class loaded dynamically from CATxxx packages."""
+    """Map (cat, item_id) -> class loaded dynamically from UAP-defined modules."""
     class_map: dict[tuple[int, str], type] = {}
 
-    for cat in cats:
+    expected_items = (
+        uap_df[["cat", "item_id"]]
+        .dropna()
+        .drop_duplicates()
+        .itertuples(index=False, name=None)
+    )
+
+    for cat_raw, item_id_raw in expected_items:
+        cat = int(cat_raw)
+        item_id = str(item_id_raw).strip()
+        if "/" not in item_id:
+            continue
+
+        item_suffix = item_id.split("/", 1)[1]
         package_name = f"asterix_decoder.data_items.CAT{cat:03d}"
-        try:
-            package = importlib.import_module(package_name)
-        except Exception:
-            continue
+        module_candidates = [
+            f"{package_name}.item_{item_suffix}",
+            f"{package_name}.item_{item_suffix.upper()}",
+            f"{package_name}.item_{item_suffix.lower()}",
+        ]
 
-        package_paths = getattr(package, "__path__", None)
-        if not package_paths:
-            continue
-
-        for module_info in pkgutil.iter_modules(package_paths):
-            if module_info.ispkg or not module_info.name.startswith("item_"):
-                continue
-            module_name = f"{package_name}.{module_info.name}"
-
+        module = None
+        for module_name in dict.fromkeys(module_candidates):
             try:
                 module = importlib.import_module(module_name)
+                break
             except Exception:
                 continue
 
-            for _, cls in inspect.getmembers(module, inspect.isclass):
-                if (
-                    cls.__module__ == module_name
-                    and callable(getattr(cls, "get_item_id", None))
-                ):
-                    item_id = str(cls.get_item_id()).strip()
-                    class_map[(cat, item_id)] = cls
+        if module is None:
+            continue
+
+        for _, cls in inspect.getmembers(module, inspect.isclass):
+            if cls.__module__ != module.__name__:
+                continue
+            get_item_id = getattr(cls, "get_item_id", None)
+            if not callable(get_item_id):
+                continue
+            if str(get_item_id()).strip() == item_id:
+                class_map[(cat, item_id)] = cls
+                break
 
     return class_map
 
@@ -155,9 +167,8 @@ def _ensure_uap_ready() -> dict[tuple[int, int], Any]:
     if _FRN_MAP is not None:
         return _FRN_MAP
 
-    _CLASS_MAP = _discover_item_classes([21, 48])
-
     uap_df = pd.concat([uap021_df, uap048_df], ignore_index=True)
+    _CLASS_MAP = _discover_item_classes(uap_df)
     uap_df["instance"] = uap_df.apply(
         lambda r: _build_instance(r, _CLASS_MAP), axis=1
     )
