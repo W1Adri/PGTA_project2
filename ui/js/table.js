@@ -20,7 +20,7 @@ const Table = (() => {
   const REQUEST_TIMEOUT_MS = 30000;
   const SEND_RETRY_DELAY_MS = 250;
   const HTTP_REQUEST_TIMEOUT_MS = 20000;
-  const API_BASE = "http://127.0.0.1:8888";
+  const API_BASE = (window.location && window.location.origin) || "http://127.0.0.1:8888";
   const TABLE_DATA_URL = `${API_BASE}/table_data`;
 
   function nextRequestId() {
@@ -269,12 +269,13 @@ const Table = (() => {
       }
 
       const data = await res.json();
+      const totalCount = data.count ?? data.total_count ?? 0;
       applyWindowData({
         startRow: params.startRow,
         endRow: params.endRow,
         windowStart: range.startRow,
         records: data.records || [],
-        totalCount: data.count || 0,
+        totalCount,
         successCallback: params.successCallback,
         failCallback: params.failCallback,
       });

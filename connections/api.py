@@ -51,17 +51,18 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
             f"upload start filename={file.filename} size={len(raw_bytes)}"
         )
 
-        last_stage: dict[str, str | None] = {"value": None}
+        last_stage: str | None = None
 
         def report_progress(detail: dict) -> None:
+            nonlocal last_stage
             broadcast_message({
                 "type": "decode_progress",
                 "status": "ok",
                 "data": detail,
             })
             stage = detail.get("stage")
-            if stage and stage != last_stage["value"]:
-                last_stage["value"] = stage
+            if stage and stage != last_stage:
+                last_stage = stage
                 actions._debug_log(
                     "decode_progress "
                     f"stage={stage} percent={detail.get('percent')} "
