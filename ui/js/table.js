@@ -241,7 +241,7 @@ const Table = (() => {
 
   function resolveHttpRange(startRow, endRow) {
     const safeStart = Math.max(0, startRow - WINDOW_MARGIN);
-    const safeEnd = Math.max(safeStart + BLOCK_SIZE, endRow + WINDOW_MARGIN);
+    const safeEnd = Math.max(safeStart + BLOCK_SIZE, endRow + WINDOW_MARGIN, endRow);
     return { startRow: safeStart, endRow: safeEnd };
   }
 
