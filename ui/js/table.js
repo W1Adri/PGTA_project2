@@ -14,9 +14,9 @@ const Table = (() => {
   let rowCache = new Map(); // absolute_row_index -> row data
   let tableReadyDispatched = false;
 
-  const BLOCK_SIZE = 100;
-  const WINDOW_MARGIN = 250;
-  const RETAIN_MARGIN = 1000;
+  const BLOCK_SIZE = 50;
+  const WINDOW_MARGIN = 40;
+  const RETAIN_MARGIN = 300;
   const REQUEST_TIMEOUT_MS = 30000;
   const SEND_RETRY_DELAY_MS = 250;
   const HTTP_REQUEST_TIMEOUT_MS = 20000;
@@ -373,7 +373,7 @@ const Table = (() => {
       columnDefs: columnDefs,
       rowModelType: 'infinite',
       cacheBlockSize: BLOCK_SIZE,
-      maxBlocksInCache: 10,
+      maxBlocksInCache: 6,
       datasource: datasource,
       rowSelection: undefined,
       suppressRowClickSelection: true,

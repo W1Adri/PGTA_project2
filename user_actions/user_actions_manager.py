@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import sys
@@ -5,7 +6,13 @@ import tempfile
 import time
 from websockets.server import WebSocketServerProtocol
 
-from asterix_decoder.database.asterix_pandas import AsterixPandas
+from asterix_decoder.database.asterix_pandas import (
+    MAP_DEFAULT_WINDOW_AFTER_SECONDS,
+    MAP_DEFAULT_WINDOW_BEFORE_SECONDS,
+    MAP_MAX_POINTS,
+    TABLE_DEFAULT_MARGIN,
+    AsterixPandas,
+)
 
 
 class Actions:
@@ -95,7 +102,7 @@ class Actions:
         Response: { "type": "get_all_result", "status": "ok",
                     "data": { "records": [ ... ] } }
         """
-        records = self.store.get_all()
+        records = await asyncio.to_thread(self.store.get_all)
         await self._send(websocket, {
             "type"  : "get_all_result",
             "status": "ok",
@@ -142,7 +149,7 @@ class Actions:
             "time_end"    : data.get("time_end"),
         }
 
-        result = self.store.apply_temporary_filters(**filters)
+        result = await asyncio.to_thread(self.store.apply_temporary_filters, **filters)
         await self._send(websocket, {
             "type"  : "apply_filters_result",
             "status": "ok",
@@ -162,7 +169,7 @@ class Actions:
         Response: { "type": "get_metadata_result", "status": "ok",
                     "data": { ...metadata... } }
         """
-        meta = self.store.get_metadata()
+        meta = await asyncio.to_thread(self.store.get_metadata)
         await self._send(websocket, {
             "type"  : "get_metadata_result",
             "status": "ok",
@@ -200,7 +207,7 @@ class Actions:
             "action": "get_table_window",
             "startRow": 1200,
             "endRow": 1300,
-            "margin": 400,
+            "margin": 40,
             "sortCol": "TIME",          // optional
             "sortDir": "asc|desc",      // optional
             "filters": {...},             // optional
@@ -222,7 +229,7 @@ class Actions:
         """
         start_row = int(data.get("startRow", 0))
         end_row = int(data.get("endRow", start_row + 100))
-        margin = int(data.get("margin", 400))
+        margin = int(data.get("margin", TABLE_DEFAULT_MARGIN))
         sort_col = data.get("sortCol")
         sort_dir = data.get("sortDir")
         request_id = data.get("request_id")
@@ -235,7 +242,8 @@ class Actions:
         )
 
         try:
-            result = self.store.get_table_window(
+            result = await asyncio.to_thread(
+                self.store.get_table_window,
                 start_row=start_row,
                 end_row=end_row,
                 margin=margin,
@@ -285,9 +293,9 @@ class Actions:
           {
             "action": "get_map_window",
             "current_time": 12345,         // required, seconds or parseable time
-            "window_before": 20,           // optional, seconds before current_time
-            "window_after": 20,            // optional, seconds after current_time
-            "max_points": 2000,            // optional cap for frontend rendering
+            "window_before": 12,           // optional, seconds before current_time
+            "window_after": 0,             // optional, seconds after current_time
+            "max_points": 500,             // optional cap for frontend rendering
             "request_id": "..."           // optional client correlation id
           }
 
@@ -300,11 +308,12 @@ class Actions:
         """
         request_id = data.get("request_id")
         current_time = data.get("current_time")
-        window_before = int(data.get("window_before", 20))
-        window_after = int(data.get("window_after", 20))
-        max_points = int(data.get("max_points", 2000))
+        window_before = int(data.get("window_before", MAP_DEFAULT_WINDOW_BEFORE_SECONDS))
+        window_after = int(data.get("window_after", MAP_DEFAULT_WINDOW_AFTER_SECONDS))
+        max_points = int(data.get("max_points", MAP_MAX_POINTS))
 
-        result = self.store.get_map_window(
+        result = await asyncio.to_thread(
+            self.store.get_map_window,
             current_time=current_time,
             window_before=window_before,
             window_after=window_after,
@@ -344,6 +353,12 @@ class Actions:
     async def _send(websocket: WebSocketServerProtocol, payload: dict) -> None:
         """Serialise and send a response dict. Silently drops if disconnected."""
         try:
-            await websocket.send(json.dumps(payload, default=str))
+            message = await asyncio.to_thread(
+                json.dumps,
+                payload,
+                default=str,
+                separators=(",", ":"),
+            )
+            await websocket.send(message)
         except Exception:
             pass   # client disconnected mid-response — ignore

@@ -10,9 +10,9 @@ const AppMap = (() => {
   const MIN_REQUEST_DEBOUNCE_MS = 35;
   const PLAYBACK_TICK_MS = 1000;
   const PLAYBACK_RATES = [1, 5, 10, 30, 60];
-  const DEFAULT_WINDOW_SECONDS = 20;
-  const MAX_RENDERED_POINTS = 1800;
-  const PRUNE_MARGIN_SECONDS = 80;
+  const DEFAULT_WINDOW_SECONDS = 12;
+  const MAX_RENDERED_POINTS = 500;
+  const PRUNE_MARGIN_SECONDS = 45;
   const MARKER_STALE_SECONDS = 10;
   const UNKNOWN_MARKER_STALE_SECONDS = 3;
   const HIGH_SPEED_TRAIL_MIN_INTERVAL_MS = 220;
@@ -177,8 +177,8 @@ const AppMap = (() => {
     const z = Number.isFinite(zoom) ? zoom : DEFAULT_ZOOM;
     const minZoom = 5;
     const maxZoom = 14;
-    const minSeconds = 20;
-    const maxSeconds = 220;
+    const minSeconds = 8;
+    const maxSeconds = 60;
     const clamped = Math.max(minZoom, Math.min(maxZoom, z));
     const ratio = (maxZoom - clamped) / (maxZoom - minZoom);
     return Math.round(minSeconds + ((ratio * ratio) * (maxSeconds - minSeconds)));

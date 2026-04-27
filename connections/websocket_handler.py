@@ -77,7 +77,7 @@ async def _dispatch(
 
 
 async def _send_error(websocket: WebSocketServerProtocol, detail: str) -> None:
-    payload = json.dumps({"type": "error", "detail": detail})
+    payload = json.dumps({"type": "error", "detail": detail}, separators=(",", ":"))
     await websocket.send(payload)
 
 
@@ -85,7 +85,7 @@ async def _broadcast(payload: dict[str, Any]) -> None:
     if not _CLIENTS:
         return
 
-    message = json.dumps(payload, default=str)
+    message = json.dumps(payload, default=str, separators=(",", ":"))
     stale_clients: list[WebSocketServerProtocol] = []
 
     for websocket in list(_CLIENTS):

@@ -17,6 +17,18 @@ import pandas as pd
 
 from asterix_decoder.database.filters import AsterixFilters
 
+TABLE_DEFAULT_MARGIN = 40
+TABLE_MAX_MARGIN = 60
+TABLE_MAX_WINDOW_ROWS = 180
+TABLE_MAX_PAGE_ROWS = 180
+
+MAP_DEFAULT_WINDOW_BEFORE_SECONDS = 12
+MAP_DEFAULT_WINDOW_AFTER_SECONDS = 0
+MAP_MAX_WINDOW_BEFORE_SECONDS = 60
+MAP_MAX_WINDOW_AFTER_SECONDS = 5
+MAP_MAX_POINTS = 500
+
+
 class AsterixPandas:
     """Thread-safe in-memory store for a decoded ASTERIX session."""
 
@@ -143,6 +155,7 @@ class AsterixPandas:
         end_row: int,
         sort_col: str | None = None,
         sort_dir: str | None = None,
+        max_rows: int = TABLE_MAX_PAGE_ROWS,
         **kwargs
     ) -> dict[str, Any]:
         """
@@ -162,7 +175,17 @@ class AsterixPandas:
                 ascending = (sort_dir != "desc")
                 df = df.sort_values(by=sort_col, ascending=ascending)
             
-            sliced_df = df.iloc[start_row:end_row]
+            safe_start = max(0, min(int(start_row), total_count))
+            safe_end = max(safe_start, min(int(end_row), total_count))
+            try:
+                page_limit = int(max_rows)
+            except (TypeError, ValueError):
+                page_limit = TABLE_MAX_PAGE_ROWS
+            if page_limit <= 0:
+                page_limit = TABLE_MAX_PAGE_ROWS
+            safe_end = min(safe_end, safe_start + page_limit)
+
+            sliced_df = df.iloc[safe_start:safe_end]
             records = sliced_df.astype(object).where(pd.notna(sliced_df), None).to_dict(orient="records")
             
             return {
@@ -175,7 +198,7 @@ class AsterixPandas:
         start_row: int,
         end_row: int,
         *,
-        margin: int = 400,
+        margin: int = TABLE_DEFAULT_MARGIN,
         sort_col: str | None = None,
         sort_dir: str | None = None,
         **kwargs,
@@ -205,11 +228,17 @@ class AsterixPandas:
                 df = df.sort_values(by=sort_col, ascending=ascending)
 
             safe_start = max(0, min(int(start_row), total_count))
-            safe_end = max(safe_start, min(int(end_row), total_count))
-            safe_margin = max(0, int(margin))
+            requested_end = max(safe_start, min(int(end_row), total_count))
+            safe_end = min(requested_end, safe_start + TABLE_MAX_WINDOW_ROWS)
+            safe_margin = min(max(0, int(margin)), TABLE_MAX_MARGIN)
 
             window_start = max(0, safe_start - safe_margin)
             window_end = min(total_count, safe_end + safe_margin)
+            if window_end - window_start > TABLE_MAX_WINDOW_ROWS:
+                window_end = window_start + TABLE_MAX_WINDOW_ROWS
+                if window_end < safe_end:
+                    window_end = safe_end
+                    window_start = max(0, window_end - TABLE_MAX_WINDOW_ROWS)
 
             sliced_df = df.iloc[window_start:window_end]
             records = sliced_df.astype(object).where(pd.notna(sliced_df), None).to_dict(orient="records")
@@ -225,9 +254,9 @@ class AsterixPandas:
         self,
         current_time: Any,
         *,
-        window_before: int = 20,
-        window_after: int = 20,
-        max_points: int = 2000,
+        window_before: int = MAP_DEFAULT_WINDOW_BEFORE_SECONDS,
+        window_after: int = MAP_DEFAULT_WINDOW_AFTER_SECONDS,
+        max_points: int = MAP_MAX_POINTS,
     ) -> dict[str, Any]:
         """Return the filtered records around a time cursor for the map player."""
         with self._lock:
@@ -263,8 +292,13 @@ class AsterixPandas:
                     "window_end_seconds": None,
                 }
 
-            before = max(0, int(window_before))
-            after = max(0, int(window_after))
+            before = min(max(0, int(window_before)), MAP_MAX_WINDOW_BEFORE_SECONDS)
+            after = min(max(0, int(window_after)), MAP_MAX_WINDOW_AFTER_SECONDS)
+            try:
+                requested_points = int(max_points)
+            except (TypeError, ValueError):
+                requested_points = MAP_MAX_POINTS
+            point_limit = MAP_MAX_POINTS if requested_points <= 0 else min(requested_points, MAP_MAX_POINTS)
             lower_bound = float(center_seconds) - before
             upper_bound = float(center_seconds) + after
 
@@ -302,8 +336,13 @@ class AsterixPandas:
                 errors="coerce",
             ).fillna(-1).astype(int)
 
-            target_col = self._col_from(window_df, "TARGET_IDENTIFICATION", "target_identification")
-            heading_col = self._col_from(window_df, "HEADING", "heading")
+            target_col = self._col_from(
+                window_df,
+                "TARGET_IDENTIFICATION",
+                "target_identification",
+                "callsign",
+            )
+            heading_col = self._col_from(window_df, "HEADING", "HDG", "heading")
             if target_col:
                 window_df["__target_id"] = window_df[target_col].astype(str).str.strip().str.upper()
                 dedupe_mask = (
@@ -333,18 +372,19 @@ class AsterixPandas:
 
             window_df = window_df.sort_values(by=["__time_seconds", "__row_id"], ascending=[True, True])
 
-            if max_points > 0 and len(window_df) > max_points:
+            if point_limit > 0 and len(window_df) > point_limit:
                 center_index = window_df["__time_seconds"].sub(float(center_seconds)).abs().idxmin()
                 if center_index in window_df.index:
                     center_pos = window_df.index.get_loc(center_index)
                 else:
                     center_pos = len(window_df) // 2
-                half = max_points // 2
+                half = point_limit // 2
                 start = max(0, center_pos - half)
-                end = min(len(window_df), start + max_points)
-                start = max(0, end - max_points)
+                end = min(len(window_df), start + point_limit)
+                start = max(0, end - point_limit)
                 window_df = window_df.iloc[start:end]
 
+            window_df = self._build_map_payload_frame(window_df, time_col, lat_col, lon_col)
             records = (
                 window_df.astype(object)
                 .where(pd.notna(window_df), None)
@@ -358,6 +398,37 @@ class AsterixPandas:
                 "window_start_seconds": float(lower_bound),
                 "window_end_seconds": float(upper_bound),
             }
+
+    def _build_map_payload_frame(
+        self,
+        window_df: pd.DataFrame,
+        time_col: str,
+        lat_col: str,
+        lon_col: str,
+    ) -> pd.DataFrame:
+        """Return only the fields the Leaflet player needs to draw a frame."""
+        payload = pd.DataFrame(index=window_df.index)
+
+        def add_alias(output_col: str, *candidates: str | None) -> None:
+            for column in candidates:
+                if column and column in window_df.columns:
+                    payload[output_col] = window_df[column]
+                    return
+
+        add_alias("CAT", "CAT", "category")
+        add_alias("TIME", time_col, "TIME", "timestamp")
+        add_alias("LAT", lat_col, "LAT", "latitude")
+        add_alias("LON", lon_col, "LON", "longitude")
+        add_alias("TARGET_IDENTIFICATION", "TARGET_IDENTIFICATION", "callsign", "target_identification")
+        add_alias("TARGET_ADDRESS", "TARGET_ADDRESS", "target_address", "ICAO", "MODE_S")
+        add_alias("TRACK_NUMBER", "TRACK_NUMBER", "track_number")
+        add_alias("HEADING", "HEADING", "HDG", "heading")
+        add_alias("MODE_3/A", "MODE_3/A", "squawk", "MODE_3A", "MODE_3_A")
+        add_alias("FL", "FL", "altitude_ft", "ALTITUDE", "altitude")
+        add_alias("__row_id", "__row_id")
+        add_alias("__time_seconds", "__time_seconds")
+
+        return payload
 
     def get_all(self) -> list[dict]:
         """Return every record (no filters)."""
