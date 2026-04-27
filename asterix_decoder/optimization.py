@@ -6,6 +6,8 @@ import os
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from typing import Any, Callable
 
+from asterix_decoder.helpers.progress import emit_progress
+
 _WORKER_FRN_MAP: dict[tuple[int, int], Any] | None = None
 _WORKER_DECODE_ONE: Callable[[int, list[int], bytes, dict[tuple[int, int], Any]], dict[str, Any]] | None = None
 _WORKER_GET_FRN_MAP: Callable[[], dict[tuple[int, int], Any]] | None = None
@@ -81,30 +83,6 @@ def resolve_parallel_config(
     return worker_count, resolved_batch_size
 
 
-def _emit_progress(
-    progress_callback: Callable[[dict[str, Any]], None] | None,
-    *,
-    stage: str,
-    current: int,
-    total: int,
-    percent: float,
-) -> None:
-    if progress_callback is None:
-        return
-
-    payload = {
-        "stage": stage,
-        "current": int(current),
-        "total": int(total),
-        "percent": round(max(0.0, min(100.0, float(percent))), 1),
-    }
-
-    try:
-        progress_callback(payload)
-    except Exception:
-        pass
-
-
 def _chunk_message_specs(
     message_specs: list[tuple[int, int, list[int], bytes]],
     chunk_size: int,
@@ -152,7 +130,7 @@ def decode_messages_sequential(
 
     for index, (_, cat, frns, data_fields) in enumerate(message_specs, start=1):
         decoded.append(decode_one(cat, frns, data_fields, frn_map))
-        _emit_progress(
+        emit_progress(
             progress_callback,
             stage="Decodificando mensajes",
             current=index,
@@ -230,7 +208,7 @@ def decode_messages(
                         decoded[index] = data
 
                     completed += batch_count
-                    _emit_progress(
+                    emit_progress(
                         progress_callback,
                         stage="Decodificando mensajes",
                         current=completed,

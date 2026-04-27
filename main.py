@@ -10,32 +10,10 @@ if sys.platform.startswith("linux"):
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox --disable-gpu --disable-software-rasterizer"
 
 import webview
-from connections.api import create_api, start_api_server
+from connections.api import JSAPI, create_api, start_api_server
 from connections.websocket_handler import start_websocket_server
 from asterix_decoder.database.asterix_pandas import AsterixPandas
 from user_actions.user_actions_manager import Actions
-
-class JSAPI:
-    def __init__(self, store: AsterixPandas):
-        self.store = store
-        
-    def trigger_download_csv(self):
-        import webview
-        try:
-            filename = webview.windows[0].create_file_dialog(
-                webview.SAVE_DIALOG, 
-                directory='', 
-                save_filename='decoded_asterix.csv'
-            )
-            if filename and len(filename) > 0:
-                with open(filename[0], "wb") as f:
-                    f.write(self.store.to_csv_bytes())
-                return "Saved successfully!"
-            return "Cancelled"
-        except Exception as e:
-            return str(e)
-
-
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 HTTP_PORT  = 8888

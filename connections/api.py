@@ -13,6 +13,28 @@ from connections.websocket_handler import broadcast_message
 from user_actions.user_actions_manager import Actions
 
 
+class JSAPI:
+    def __init__(self, store: AsterixPandas):
+        self.store = store
+
+    def trigger_download_csv(self):
+        import webview
+
+        try:
+            filename = webview.windows[0].create_file_dialog(
+                webview.SAVE_DIALOG,
+                directory="",
+                save_filename="decoded_asterix.csv",
+            )
+            if filename and len(filename) > 0:
+                with open(filename[0], "wb") as f:
+                    f.write(self.store.to_csv_bytes())
+                return "Saved successfully!"
+            return "Cancelled"
+        except Exception as e:
+            return str(e)
+
+
 def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
     """Build and return the configured FastAPI application."""
 

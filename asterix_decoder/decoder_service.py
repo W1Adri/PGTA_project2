@@ -2,30 +2,17 @@ from __future__ import annotations
 
 import importlib
 import inspect
+from functools import lru_cache
 from typing import Any, Callable
 
 import pandas as pd
 
 from asterix_decoder.data_items.data_item import ItemXXX
-from asterix_decoder.data_tables.uap_tables import uap021_df, uap048_df
 from asterix_decoder.data_tables.csv_table import CAT021_COLUMNS, CAT048_COLUMNS, COMBINED_COLUMNS
 from asterix_decoder.helpers.compute_target_lat_lon import compute_target_lat_lon
+from asterix_decoder.helpers.progress import emit_progress
+from asterix_decoder.data_tables.uap_tables import uap021_df, uap048_df
 from asterix_decoder.optimization import decode_messages
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Module-level caches (computed once, reused across uploads)
-# ══════════════════════════════════════════════════════════════════════════════
-
-_CLASS_MAP: dict[tuple[int, str], type] | None = None
-_UAP_DF: pd.DataFrame | None = None
-_FRN_MAP: dict[tuple[int, int], Any] | None = None
-
-# Pre-computed FSPEC lookup tables (from notebook Block 3)
-_ACTIVE_OFFSETS: tuple[tuple[int, ...], ...] = tuple(
-    tuple(i for i in range(7) if (b >> (7 - i)) & 1)
-    for b in range(256)
-)
-_HAS_FX: tuple[bool, ...] = tuple(bool(b & 1) for b in range(256))
 
 # Barcelona TMA bounding box (from notebook Block 6)
 _LAT_MIN, _LAT_MAX = 40.9, 41.7
@@ -33,42 +20,18 @@ _LON_MIN, _LON_MAX = 1.5, 2.6
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Block 2 — Split the binary stream into ASTERIX messages
+# Block 3 — Parse FSPEC and build the UAP registry
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _split_messages(raw: bytes) -> pd.DataFrame:
-    """Walk the binary stream and return a DataFrame with one row per message."""
-    view = memoryview(raw)
-    total = len(raw)
-    rows: list[dict] = []
-    offset = 0
-    msg_id = 1
-
-    while offset + 3 <= total:
-        cat = view[offset]
-        length = int.from_bytes(view[offset + 1:offset + 3], "big")
-
-        if length < 3 or offset + length > total:
-            raise ValueError(f"Invalid message at offset {offset}: LEN={length}")
-
-        rows.append({
-            "message_id":  msg_id,
-            "offset":      offset,
-            "cat":         cat,
-            "length":      length,
-            "data_record": bytes(view[offset + 3:offset + length]),
-        })
-        offset += length
-        msg_id += 1
-
-    return pd.DataFrame(rows)
+_ACTIVE_OFFSETS: tuple[tuple[int, ...], ...] = tuple(
+    tuple(i for i in range(7) if (b >> (7 - i)) & 1)
+    for b in range(256)
+)
+_HAS_FX: tuple[bool, ...] = tuple(bool(b & 1) for b in range(256))
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Block 3 — Parse the FSPEC of each message
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _parse_fspec(data_record: bytes) -> tuple[list[int], bytes]:
+def parse_fspec(data_record: bytes) -> tuple[list[int], bytes]:
+    """Return the FRNs present in a record and the remaining data fields."""
     frns: list[int] = []
     frn_base: int = 1
     cursor: int = 0
@@ -88,9 +51,9 @@ def _parse_fspec(data_record: bytes) -> tuple[list[int], bytes]:
     return frns, data_record[cursor:]
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Block 4 — Discover item decoder classes and build the UAP
-# ══════════════════════════════════════════════════════════════════════════════
+def _load_uap_dataframe() -> pd.DataFrame:
+    return pd.concat([uap021_df, uap048_df], ignore_index=True)
+
 
 def _discover_item_classes(
     uap_df: pd.DataFrame,
@@ -160,54 +123,55 @@ def _build_instance(row: pd.Series, class_map: dict[tuple[int, str], type]):
         return cls(item_name, length_str)
 
 
-def _ensure_uap_ready() -> dict[tuple[int, int], Any]:
-    """Lazily build and cache the UAP dataframe and FRN→instance map."""
-    global _CLASS_MAP, _UAP_DF, _FRN_MAP
-
-    if _FRN_MAP is not None:
-        return _FRN_MAP
-
-    uap_df = pd.concat([uap021_df, uap048_df], ignore_index=True)
-    _CLASS_MAP = _discover_item_classes(uap_df)
+@lru_cache(maxsize=1)
+def get_frn_map() -> dict[tuple[int, int], Any]:
+    """Build the cached FRN -> decoder instance lookup."""
+    uap_df = _load_uap_dataframe()
+    class_map = _discover_item_classes(uap_df)
+    uap_df = uap_df.copy()
     uap_df["instance"] = uap_df.apply(
-        lambda r: _build_instance(r, _CLASS_MAP), axis=1
+        lambda r: _build_instance(r, class_map), axis=1
     )
-    _UAP_DF = uap_df
-
-    _FRN_MAP = dict(
+    return dict(
         zip(
             uap_df[["cat", "frn"]].apply(tuple, axis=1),
             uap_df["instance"],
         )
     )
-    return _FRN_MAP
-
-
-def _emit_progress(
-    progress_callback: Callable[[dict[str, Any]], None] | None,
-    *,
-    stage: str,
-    current: int,
-    total: int,
-    percent: float,
-) -> None:
-    if progress_callback is None:
-        return
-
-    payload = {
-        "stage": stage,
-        "current": int(current),
-        "total": int(total),
-        "percent": round(max(0.0, min(100.0, float(percent))), 1),
-    }
-
-    try:
-        progress_callback(payload)
-    except Exception:
-        pass
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Block 2 — Split the binary stream into ASTERIX messages
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _split_messages(raw: bytes) -> pd.DataFrame:
+    """Walk the binary stream and return a DataFrame with one row per message."""
+    view = memoryview(raw)
+    total = len(raw)
+    rows: list[dict] = []
+    offset = 0
+    msg_id = 1
+
+    while offset + 3 <= total:
+        cat = view[offset]
+        length = int.from_bytes(view[offset + 1:offset + 3], "big")
+
+        if length < 3 or offset + length > total:
+            raise ValueError(f"Invalid message at offset {offset}: LEN={length}")
+
+        rows.append({
+            "message_id":  msg_id,
+            "offset":      offset,
+            "cat":         cat,
+            "length":      length,
+            "data_record": bytes(view[offset + 3:offset + length]),
+        })
+        offset += length
+        msg_id += 1
+
+    return pd.DataFrame(rows)
+
+
 # Block 5 — Decode each message into structured fields
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -366,7 +330,7 @@ def decode_asterix(
     if len(raw_bytes) < 3:
         raise ValueError("File is too short to contain a valid ASTERIX header.")
 
-    _emit_progress(
+    emit_progress(
         progress_callback,
         stage="Reading file .ast",
         current=0,
@@ -378,7 +342,7 @@ def decode_asterix(
     messages_df = _split_messages(raw_bytes)
     print(f"[Decoder] Messages found: {len(messages_df):,}")
 
-    _emit_progress(
+    emit_progress(
         progress_callback,
         stage="Splitting messages",
         current=len(messages_df),
@@ -389,10 +353,10 @@ def decode_asterix(
     # Step 2: parse FSPEC and build decode specs in a single pass
     message_specs: list[tuple[int, int, list[int], bytes]] = []
     for index, row in enumerate(messages_df[["cat", "data_record"]].itertuples(index=False)):
-        frns, data_fields = _parse_fspec(row.data_record)
+        frns, data_fields = parse_fspec(row.data_record)
         message_specs.append((index, int(row.cat), frns, data_fields))
 
-    _emit_progress(
+    emit_progress(
         progress_callback,
         stage="Reading FSPEC",
         current=len(message_specs),
@@ -401,9 +365,9 @@ def decode_asterix(
     )
 
     # Step 3: ensure UAP decoders are ready (cached after first call)
-    _ensure_uap_ready()
+    get_frn_map()
 
-    _emit_progress(
+    emit_progress(
         progress_callback,
         stage="Preparing decoders",
         current=len(messages_df),
@@ -415,7 +379,7 @@ def decode_asterix(
     decoded_rows = decode_messages(
         message_specs,
         _decode_message,
-        _ensure_uap_ready,
+        get_frn_map,
         progress_callback=progress_callback,
         workers=workers,
         batch_size=batch_size,
@@ -438,7 +402,7 @@ def decode_asterix(
                 "in the packaged build (check PyInstaller hiddenimports)."
             )
 
-    _emit_progress(
+    emit_progress(
         progress_callback,
         stage="Finalizing table",
         current=len(final_df),
