@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import importlib
-import importlib.util
 import inspect
 import pkgutil
-from pathlib import Path
 from typing import Any, Callable
 
 import pandas as pd
@@ -97,22 +95,24 @@ def _parse_fspec(data_record: bytes) -> tuple[list[int], bytes]:
 
 def _discover_item_classes(
     cats: list[int],
-    base_folder: Path | None = None,
 ) -> dict[tuple[int, str], type]:
-    """Map (cat, item_id) → class loaded dynamically from CATxxx folders."""
-    if base_folder is None:
-        base_folder = Path(__file__).parent / "data_items"
-
+    """Map (cat, item_id) -> class loaded dynamically from CATxxx packages."""
     class_map: dict[tuple[int, str], type] = {}
 
     for cat in cats:
-        folder = base_folder / f"CAT{cat:03d}"
-        if not folder.exists():
+        package_name = f"asterix_decoder.data_items.CAT{cat:03d}"
+        try:
+            package = importlib.import_module(package_name)
+        except Exception:
             continue
 
-        package_name = f"asterix_decoder.data_items.CAT{cat:03d}"
+        package_paths = getattr(package, "__path__", None)
+        if not package_paths:
+            continue
 
-        for module_info in pkgutil.iter_modules([str(folder)]):
+        for module_info in pkgutil.iter_modules(package_paths):
+            if module_info.ispkg or not module_info.name.startswith("item_"):
+                continue
             module_name = f"{package_name}.{module_info.name}"
 
             try:

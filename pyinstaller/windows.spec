@@ -5,18 +5,6 @@ import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(SPEC)))
 block_cipher = None
 
-def collect_python_files(source_root, destination_root):
-    files = []
-    for current_root, _, filenames in os.walk(source_root):
-        for filename in filenames:
-            if not filename.endswith('.py'):
-                continue
-            source_path = os.path.join(current_root, filename)
-            relative_path = os.path.relpath(source_path, source_root)
-            target_path = os.path.join(destination_root, relative_path)
-            files.append((source_path, target_path))
-    return files
-
 def safe_collect(package):
     try:
         d, b, h = collect_all(package)
@@ -44,10 +32,6 @@ mp_d, mp_b, mp_h = safe_collect('multipart')       # python-multipart
 # python-multipart: collect both possible module names + metadata
 mp_d, mp_b, mp_h = safe_collect('multipart')
 mp2_d, mp2_b, mp2_h = safe_collect('python_multipart')
-data_items_sources = collect_python_files(
-    os.path.join(ROOT, 'asterix_decoder', 'data_items'),
-    os.path.join('asterix_decoder', 'data_items'),
-)
 
 # copy_metadata is required so FastAPI's runtime check finds the package
 multipart_meta = (
@@ -58,7 +42,6 @@ multipart_meta = (
 
 all_datas = (
     [(os.path.join(ROOT, 'ui'), 'ui')]
-    + data_items_sources
     + uv_d + st_d + fa_d + ws_d + wv_d + pn_d + cl_d
     + mp_d + mp2_d
     + multipart_meta
