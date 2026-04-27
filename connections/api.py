@@ -126,7 +126,10 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
             sort_col=sort_col,
             sort_dir=sort_dir,
         )
-        return result
+        return {
+            **result,
+            "total_count": result.get("count", 0),
+        }
 
     # ── Static frontend — MUST be last so API routes take priority ────────────
     api.mount("/", StaticFiles(directory=resource_path("ui"), html=True), name="ui")

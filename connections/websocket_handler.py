@@ -17,6 +17,10 @@ def _debug_ws(message: str) -> None:
     Actions._debug_log(f"[WS] {message}")
 
 
+def _make_drop_key(reason: str, payload_type: Any) -> str:
+    return f"{reason}:{payload_type}"
+
+
 # ── Per-connection handler ────────────────────────────────────────────────────
 
 async def _handle_connection(
@@ -98,14 +102,14 @@ def broadcast_message(payload: dict[str, Any]) -> None:
     """Thread-safe broadcast helper for progress updates and alerts."""
     global _LAST_BROADCAST_DROP
     if _SERVER_LOOP is None or _SERVER_LOOP.is_closed():
-        drop_key = f"no_loop:{payload.get('type')}"
+        drop_key = _make_drop_key("no_loop", payload.get("type"))
         if drop_key != _LAST_BROADCAST_DROP:
             _LAST_BROADCAST_DROP = drop_key
             _debug_ws(f"Broadcast skipped (no loop) type={payload.get('type')}")
         return
 
     if not _CLIENTS:
-        drop_key = f"no_clients:{payload.get('type')}"
+        drop_key = _make_drop_key("no_clients", payload.get("type"))
         if drop_key != _LAST_BROADCAST_DROP:
             _LAST_BROADCAST_DROP = drop_key
             _debug_ws(f"Broadcast skipped (no clients) type={payload.get('type')}")

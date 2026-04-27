@@ -20,7 +20,7 @@ const Table = (() => {
   const REQUEST_TIMEOUT_MS = 30000;
   const SEND_RETRY_DELAY_MS = 250;
   const HTTP_REQUEST_TIMEOUT_MS = 20000;
-  const API_BASE = (window.location && window.location.origin) || "http://127.0.0.1:8888";
+  const API_BASE = window.location.origin || "http://127.0.0.1:8888";
   const TABLE_DATA_URL = `${API_BASE}/table_data`;
 
   function nextRequestId() {
