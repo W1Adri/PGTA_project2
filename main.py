@@ -48,7 +48,7 @@ APP_HEIGHT = 900
 if __name__ == "__main__":
 
     multiprocessing.freeze_support()
-    webview.settings["DRAG_REGION_SELECTOR"] = ".pywebview-drag-region"
+    is_windows = sys.platform.startswith("win")
 
     # 1. Shared in-memory store (single source of truth)
     store = AsterixPandas()
@@ -89,5 +89,6 @@ if __name__ == "__main__":
         min_size  = (900, 600),
         js_api    = api_instance,
     )
-    webview.start(gui="qt")
+    gui_backend = "edgechromium" if is_windows else "qt"
+    webview.start(gui=gui_backend)
     print("Window closed. Exiting.")
