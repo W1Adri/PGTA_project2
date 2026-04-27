@@ -15,9 +15,10 @@ const Table = (() => {
   let tableReadyDispatched = false;
 
   const BLOCK_SIZE = 100;
-  const WINDOW_MARGIN = 400;
+  const WINDOW_MARGIN = 250;
   const RETAIN_MARGIN = 1000;
-  const REQUEST_TIMEOUT_MS = 8000;
+  const REQUEST_TIMEOUT_MS = 30000;
+  const SEND_RETRY_DELAY_MS = 250;
 
   function nextRequestId() {
     requestSeq += 1;
@@ -28,6 +29,7 @@ const Table = (() => {
     const staleRequests = [...pendingRequests.values()];
     staleRequests.forEach((pending) => {
       if (pending.timeoutId) clearTimeout(pending.timeoutId);
+      if (pending.retryId) clearTimeout(pending.retryId);
     });
     rowCache.clear();
     pendingRequests.clear();
@@ -99,26 +101,7 @@ const Table = (() => {
     const { sortCol, sortDir } = getSortFromParams(params);
     const requestId = nextRequestId();
 
-    pendingRequests.set(requestId, {
-      generation: cacheGeneration,
-      startRow,
-      endRow,
-      successCallback: params.successCallback,
-      failCallback: params.failCallback,
-      timeoutId: setTimeout(() => {
-        const stale = pendingRequests.get(requestId);
-        if (!stale) return;
-        pendingRequests.delete(requestId);
-        stale.failCallback();
-        if (gridApi) {
-          gridApi.setGridOption("loading", false);
-          updateFooter(0, false);
-          gridApi.showNoRowsOverlay();
-        }
-      }, REQUEST_TIMEOUT_MS),
-    });
-
-    const sent = WS.send({
+    const payload = {
       action: "get_table_window",
       request_id: requestId,
       startRow,
@@ -126,19 +109,40 @@ const Table = (() => {
       margin: WINDOW_MARGIN,
       sortCol,
       sortDir,
+    };
+
+    pendingRequests.set(requestId, {
+      generation: cacheGeneration,
+      startRow,
+      endRow,
+      payload,
+      successCallback: params.successCallback,
+      failCallback: params.failCallback,
+      timeoutId: setTimeout(() => {
+        const stale = pendingRequests.get(requestId);
+        if (!stale) return;
+        if (stale.retryId) clearTimeout(stale.retryId);
+        pendingRequests.delete(requestId);
+        stale.failCallback();
+        if (gridApi) {
+          gridApi.setGridOption("loading", false);
+          setProcessingFooter("Table request timed out. Retrying may be needed.");
+          gridApi.showNoRowsOverlay();
+        }
+      }, REQUEST_TIMEOUT_MS),
     });
 
-    if (!sent) {
+    const trySend = () => {
       const pending = pendingRequests.get(requestId);
-      if (pending?.timeoutId) clearTimeout(pending.timeoutId);
-      pendingRequests.delete(requestId);
-      params.failCallback();
-      if (gridApi) {
-        gridApi.setGridOption("loading", false);
-        updateFooter(0, false);
-        gridApi.showNoRowsOverlay();
-      }
-    }
+      if (!pending) return;
+
+      const sent = WS.send(pending.payload);
+      if (sent) return;
+
+      pending.retryId = setTimeout(trySend, SEND_RETRY_DELAY_MS);
+    };
+
+    trySend();
   }
 
   function onTableWindow(payload) {
@@ -148,9 +152,20 @@ const Table = (() => {
 
     const pending = pendingRequests.get(requestId);
     if (pending?.timeoutId) clearTimeout(pending.timeoutId);
+    if (pending?.retryId) clearTimeout(pending.retryId);
     pendingRequests.delete(requestId);
 
     if (pending.generation !== cacheGeneration) return;
+
+    if (payload?.status && payload.status !== "ok") {
+      pending.failCallback();
+      if (gridApi) {
+        gridApi.setGridOption("loading", false);
+        setProcessingFooter(`Table error: ${data.detail || "unknown error"}`);
+        gridApi.showNoRowsOverlay();
+      }
+      return;
+    }
 
     const windowStart = data.window_start || 0;
     const records = data.records || [];
@@ -183,6 +198,12 @@ const Table = (() => {
     if (gridApi) gridApi.setGridOption("loading", false);
 
     dispatchTableReady();
+  }
+
+  function onWsError(payload) {
+    if (!hasDatasetLoaded) return;
+    const detail = payload?.detail || "WebSocket request failed";
+    setProcessingFooter(`WebSocket error: ${detail}`);
   }
 
   // ── AG Grid Datasource ──────────────────────────────────────────────────
@@ -401,6 +422,7 @@ const Table = (() => {
 
     // 4. Main table stream channel
     WS.on("table_window_result", onTableWindow);
+    WS.on("error", onWsError);
 
     // Keep initial table state clean while no file exists.
     if (gridApi) {

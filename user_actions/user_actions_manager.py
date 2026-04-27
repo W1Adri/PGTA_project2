@@ -1,4 +1,8 @@
 import json
+import os
+import sys
+import tempfile
+import time
 from websockets.server import WebSocketServerProtocol
 
 from asterix_decoder.database.asterix_pandas import AsterixPandas
@@ -8,6 +12,21 @@ class Actions:
 
     def __init__(self, store: AsterixPandas):
         self.store = store
+
+    @staticmethod
+    def _debug_log(message: str) -> None:
+        """Persist runtime diagnostics for packaged builds and opt-in debug runs."""
+        should_log = getattr(sys, "frozen", False) or os.environ.get("ASTERIX_DEBUG_LOG") == "1"
+        if not should_log:
+            return
+
+        try:
+            log_path = os.path.join(tempfile.gettempdir(), "asterix_decoder_debug.log")
+            timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"[{timestamp}] {message}\n")
+        except Exception:
+            pass
 
     # ── Dispatcher ────────────────────────────────────────────────────────────
 
@@ -193,23 +212,52 @@ class Actions:
         sort_col = data.get("sortCol")
         sort_dir = data.get("sortDir")
         request_id = data.get("request_id")
+        started_at = time.perf_counter()
 
-        result = self.store.get_table_window(
-            start_row=start_row,
-            end_row=end_row,
-            margin=margin,
-            sort_col=sort_col,
-            sort_dir=sort_dir,
+        self._debug_log(
+            "table_window request "
+            f"id={request_id} start={start_row} end={end_row} margin={margin} "
+            f"sort={sort_col}:{sort_dir}"
         )
 
-        await self._send(websocket, {
-            "type": "table_window_result",
-            "status": "ok",
-            "data": {
-                "request_id": request_id,
-                **result,
-            },
-        })
+        try:
+            result = self.store.get_table_window(
+                start_row=start_row,
+                end_row=end_row,
+                margin=margin,
+                sort_col=sort_col,
+                sort_dir=sort_dir,
+            )
+
+            elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+            self._debug_log(
+                "table_window result "
+                f"id={request_id} total={result.get('total_count', 0)} "
+                f"records={len(result.get('records', []))} elapsed_ms={elapsed_ms}"
+            )
+
+            await self._send(websocket, {
+                "type": "table_window_result",
+                "status": "ok",
+                "data": {
+                    "request_id": request_id,
+                    **result,
+                },
+            })
+        except Exception as exc:
+            elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+            self._debug_log(
+                "table_window error "
+                f"id={request_id} elapsed_ms={elapsed_ms} error={exc}"
+            )
+            await self._send(websocket, {
+                "type": "table_window_result",
+                "status": "error",
+                "data": {
+                    "request_id": request_id,
+                    "detail": str(exc),
+                },
+            })
 
     async def action_get_map_window(
         self,
