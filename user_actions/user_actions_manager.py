@@ -14,6 +14,35 @@ from asterix_decoder.database.asterix_pandas import (
     AsterixPandas,
 )
 
+FILTER_PAYLOAD_KEYS = (
+    "callsigns",
+    "categories",
+    "target_identifications",
+    "on_ground",
+    "pure_white",
+    "fl_min",
+    "fl_max",
+    "fl_keep_null",
+    "squawks",
+    "altitude_min",
+    "altitude_max",
+    "time_start",
+    "time_end",
+)
+
+
+def extract_filter_payload(data: dict) -> dict:
+    """Return filter fields from either a nested filters object or top-level payload."""
+    source = data.get("filters")
+    if not isinstance(source, dict):
+        source = data
+
+    return {
+        key: source.get(key)
+        for key in FILTER_PAYLOAD_KEYS
+        if key in source
+    }
+
 
 class Actions:
 
@@ -133,21 +162,7 @@ class Actions:
           { "type": "apply_filters_result", "status": "ok",
             "data": { "records": [ ... ], "count": 123 } }
         """
-        filters = {
-            "callsigns"   : data.get("callsigns"),
-            "categories"  : data.get("categories"),
-            "target_identifications": data.get("target_identifications"),
-            "on_ground"   : data.get("on_ground"),
-            "pure_white"  : data.get("pure_white"),
-            "fl_min"      : data.get("fl_min"),
-            "fl_max"      : data.get("fl_max"),
-            "fl_keep_null": data.get("fl_keep_null"),
-            "squawks"     : data.get("squawks"),
-            "altitude_min": data.get("altitude_min"),
-            "altitude_max": data.get("altitude_max"),
-            "time_start"  : data.get("time_start"),
-            "time_end"    : data.get("time_end"),
-        }
+        filters = extract_filter_payload(data)
 
         result = await asyncio.to_thread(self.store.apply_temporary_filters, **filters)
         await self._send(websocket, {
@@ -210,7 +225,7 @@ class Actions:
             "margin": 40,
             "sortCol": "TIME",          // optional
             "sortDir": "asc|desc",      // optional
-            "filters": {...},             // optional
+            "filters": {...},           // optional
             "request_id": "uuid-like"   // optional client correlation id
           }
 
@@ -232,13 +247,14 @@ class Actions:
         margin = int(data.get("margin", TABLE_DEFAULT_MARGIN))
         sort_col = data.get("sortCol")
         sort_dir = data.get("sortDir")
+        filters = extract_filter_payload(data)
         request_id = data.get("request_id")
         started_at = time.perf_counter()
 
         self._debug_log(
             "table_window request "
             f"id={request_id} start={start_row} end={end_row} margin={margin} "
-            f"sort={sort_col}:{sort_dir}"
+            f"sort={sort_col}:{sort_dir} filters={list(filters.keys())}"
         )
 
         try:
@@ -249,6 +265,7 @@ class Actions:
                 margin=margin,
                 sort_col=sort_col,
                 sort_dir=sort_dir,
+                **filters,
             )
 
             elapsed_ms = int((time.perf_counter() - started_at) * 1000)
@@ -296,6 +313,7 @@ class Actions:
             "window_before": 12,           // optional, seconds before current_time
             "window_after": 0,             // optional, seconds after current_time
             "max_points": 500,             // optional cap for frontend rendering
+            "filters": {...},              // optional
             "request_id": "..."           // optional client correlation id
           }
 
@@ -311,12 +329,13 @@ class Actions:
         window_before = int(data.get("window_before", MAP_DEFAULT_WINDOW_BEFORE_SECONDS))
         window_after = int(data.get("window_after", MAP_DEFAULT_WINDOW_AFTER_SECONDS))
         max_points = int(data.get("max_points", MAP_MAX_POINTS))
+        filters = extract_filter_payload(data)
         started_at = time.perf_counter()
 
         self._debug_log(
             "map_window request "
             f"id={request_id} time={current_time} before={window_before} "
-            f"after={window_after} max_points={max_points}"
+            f"after={window_after} max_points={max_points} filters={list(filters.keys())}"
         )
 
         try:
@@ -326,6 +345,7 @@ class Actions:
                 window_before=window_before,
                 window_after=window_after,
                 max_points=max_points,
+                **filters,
             )
 
             elapsed_ms = int((time.perf_counter() - started_at) * 1000)

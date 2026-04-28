@@ -257,10 +257,14 @@ class AsterixPandas:
         window_before: int = MAP_DEFAULT_WINDOW_BEFORE_SECONDS,
         window_after: int = MAP_DEFAULT_WINDOW_AFTER_SECONDS,
         max_points: int = MAP_MAX_POINTS,
+        **kwargs,
     ) -> dict[str, Any]:
         """Return the filtered records around a time cursor for the map player."""
         with self._lock:
-            df = self._current_df()
+            if kwargs:
+                df = self._filters.apply_filters(**kwargs)
+            else:
+                df = self._current_df()
             if df.empty:
                 return {
                     "records": [],

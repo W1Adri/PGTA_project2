@@ -99,6 +99,17 @@ const Table = (() => {
     return { sortCol: null, sortDir: null };
   }
 
+  function getActiveFilters() {
+    try {
+      if (typeof Filters !== "undefined" && typeof Filters.getActive === "function") {
+        return Filters.getActive() || {};
+      }
+    } catch (err) {
+      console.warn("[Table] Could not collect active filters:", err);
+    }
+    return {};
+  }
+
   function requestWindow(params) {
     const startRow = params.startRow;
     const endRow = params.endRow;
@@ -121,6 +132,7 @@ const Table = (() => {
       margin: WINDOW_MARGIN,
       sortCol,
       sortDir,
+      filters: getActiveFilters(),
     };
 
     pendingRequests.set(requestId, {
@@ -266,11 +278,12 @@ const Table = (() => {
     return { startRow: safeStart, endRow: safeEnd };
   }
 
-  async function requestWindowHttp(params, reason) {
+  async function requestWindowHttp(params, reason, filters = null) {
     const { sortCol, sortDir } = getSortFromParams(params);
     const range = resolveHttpRange(params.startRow, params.endRow);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), HTTP_REQUEST_TIMEOUT_MS);
+    const activeFilters = filters || getActiveFilters();
 
     try {
       const res = await fetch(TABLE_DATA_URL, {
@@ -281,6 +294,7 @@ const Table = (() => {
           endRow: range.endRow,
           sortCol,
           sortDir,
+          filters: activeFilters,
         }),
         signal: controller.signal,
       });
@@ -318,7 +332,7 @@ const Table = (() => {
     pending.fallbackUsed = true;
     if (pending.retryId) clearTimeout(pending.retryId);
     if (pending.timeoutId) clearTimeout(pending.timeoutId);
-    requestWindowHttp(pending.params, reason);
+    requestWindowHttp(pending.params, reason, pending.payload?.filters);
     return true;
   }
 

@@ -468,6 +468,17 @@ const AppMap = (() => {
     }
   }
 
+  function getActiveFilters() {
+    try {
+      if (typeof Filters !== "undefined" && typeof Filters.getActive === "function") {
+        return Filters.getActive() || {};
+      }
+    } catch (err) {
+      console.warn("[Map] Could not collect active filters:", err);
+    }
+    return {};
+  }
+
   function buildWindowPayload(requestId) {
     return {
       action: "get_map_window",
@@ -476,6 +487,7 @@ const AppMap = (() => {
       window_before: state.windowBefore,
       window_after: state.windowAfter,
       max_points: state.maxPoints,
+      filters: getActiveFilters(),
     };
   }
 
@@ -535,6 +547,7 @@ const AppMap = (() => {
           window_before: payload.window_before,
           window_after: payload.window_after,
           max_points: payload.max_points,
+          filters: payload.filters || getActiveFilters(),
         }),
         signal: controller.signal,
       });

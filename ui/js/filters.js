@@ -76,6 +76,12 @@ const Filters = (() => {
 
     if (!WS.send(payload)) {
       console.warn("[Filters] WS not ready.");
+      window.dispatchEvent(new CustomEvent("asterix:filters-applied", {
+        detail: {
+          active_filters: raw,
+          fallback: true,
+        },
+      }));
     }
   }
 

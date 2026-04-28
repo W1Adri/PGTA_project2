@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from asterix_decoder.database.asterix_pandas import TABLE_MAX_PAGE_ROWS, AsterixPandas
 from connections.websocket_handler import broadcast_message
-from user_actions.user_actions_manager import Actions
+from user_actions.user_actions_manager import Actions, extract_filter_payload
 
 
 class JSAPI:
@@ -142,7 +142,8 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
         end_row = body.get("endRow", 100)
         sort_col = body.get("sortCol")
         sort_dir = body.get("sortDir")
-        
+        filters = extract_filter_payload(body)
+
         result = await run_in_threadpool(
             store.filter_paginated,
             start_row=start_row,
@@ -150,6 +151,7 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
             sort_col=sort_col,
             sort_dir=sort_dir,
             max_rows=TABLE_MAX_PAGE_ROWS,
+            **filters,
         )
         return {
             **result,
@@ -165,12 +167,14 @@ def create_api(store: AsterixPandas, actions: Actions) -> FastAPI:
         except Exception:
             body = {}
 
+        filters = extract_filter_payload(body)
         result = await run_in_threadpool(
             store.get_map_window,
             current_time=body.get("current_time"),
             window_before=body.get("window_before", 12),
             window_after=body.get("window_after", 0),
             max_points=body.get("max_points", 500),
+            **filters,
         )
         return result
 
