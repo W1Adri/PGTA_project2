@@ -98,7 +98,7 @@ const Filters = (() => {
     if (onGround) onGround.checked = true;
 
     const pureWhite = document.getElementById("f-pure-white");
-    if (pureWhite) pureWhite.checked = false;
+    if (pureWhite) pureWhite.checked = true;
 
     const keepFlNull = document.getElementById("f-fl-keep-null");
     if (keepFlNull) keepFlNull.checked = true;
@@ -511,7 +511,7 @@ const Filters = (() => {
   function pureWhiteFilterValue() {
     const pureWhite = document.getElementById("f-pure-white");
     if (!pureWhite) return null;
-    return pureWhite.checked ? true : null;
+    return pureWhite.checked ? null : false;
   }
 
   function keepFlNullFilterValue() {
