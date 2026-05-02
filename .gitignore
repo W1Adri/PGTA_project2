@@ -3,6 +3,11 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+
+agents/
+example_teacher/
+pedido/
+
 # C extensions
 *.so
 
