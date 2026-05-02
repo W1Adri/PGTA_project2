@@ -593,12 +593,16 @@ const AppMap = (() => {
       record?.TRACK_NUMBER,
     ].find(value => value !== null && value !== undefined && String(value).trim() !== "");
 
+    const category = String(record?.CAT || "").toUpperCase();
+
     if (trackId !== undefined) {
-      return String(trackId).trim().toUpperCase();
+      const baseKey = String(trackId).trim().toUpperCase();
+      return category ? `${baseKey}|${category}` : baseKey;
     }
 
     if (record && record.__row_id !== null && record.__row_id !== undefined) {
-      return String(record.__row_id);
+      const baseId = String(record.__row_id);
+      return category ? `${baseId}|${category}` : baseId;
     }
 
     const parts = [
@@ -678,15 +682,20 @@ const AppMap = (() => {
     });
   }
 
-  function getMarkerColor(record) {
-    const airlineCode = getAirlineCode(record);
-    const airlineColor = pickAirlineColor(airlineCode);
-    if (airlineColor) return airlineColor;
+  function getSensorInfo(record) {
+    const category = String(record?.CAT || "").toUpperCase();
+    if (category === "CAT048") {
+      return { sensorName: "Radar", category: "CAT048", color: "#FF0000" };
+    }
+    if (category === "CAT021") {
+      return { sensorName: "ADSB", category: "CAT021", color: "#0000FF" };
+    }
+    return { sensorName: "Unknown", category, color: "#808080" };
+  }
 
-    const category = String(record?.CAT || record?.category || "").toUpperCase();
-    if (category === "CAT021") return "#2563eb";
-    if (category === "CAT048") return "#c2410c";
-    return "#0f766e";
+  function getMarkerColor(record) {
+    const sensorInfo = getSensorInfo(record);
+    return sensorInfo.color;
   }
 
   function buildPopupContent(record) {
@@ -732,6 +741,7 @@ const AppMap = (() => {
       const layer = L.marker([lat, lon], { icon });
 
       layer.addTo(markersLayer);
+      const sensorInfo = getSensorInfo(record);
       entry = {
         layer,
         timeSeconds: Number.isFinite(timeSeconds) ? timeSeconds : null,
@@ -740,6 +750,8 @@ const AppMap = (() => {
         targetLabel,
         color,
         heading: normalizedHeading,
+        sensorCategory: sensorInfo.category,
+        sensorName: sensorInfo.sensorName,
       };
       markersById.set(key, entry);
       entry.layer.bindPopup(popupContent);
@@ -753,12 +765,15 @@ const AppMap = (() => {
         entry.layer.setIcon(buildAircraftIcon(record, color));
       }
 
+      const sensorInfo = getSensorInfo(record);
       entry.timeSeconds = Number.isFinite(timeSeconds) ? timeSeconds : entry.timeSeconds;
       entry.lastUpdateSecond = Number.isFinite(timeSeconds) ? timeSeconds : entry.lastUpdateSecond;
       entry.airlineCode = airlineCode;
       entry.targetLabel = targetLabel;
       entry.color = color;
       entry.heading = normalizedHeading;
+      entry.sensorCategory = sensorInfo.category;
+      entry.sensorName = sensorInfo.sensorName;
       if (entry.layer.getPopup()) {
         entry.layer.setPopupContent(popupContent);
       } else {
@@ -788,35 +803,36 @@ const AppMap = (() => {
     const legend = document.getElementById("map-legend-box");
     if (!legend) return;
 
-    const byAirline = new Map();
+    const byAircraftSensor = new Map();
     for (const entry of markersById.values()) {
-      const code = String(entry?.airlineCode || "UNKNOWN").trim().toUpperCase() || "UNKNOWN";
-      const color = entry?.color || "#0f766e";
-      if (!byAirline.has(code)) {
-        byAirline.set(code, { color, targets: new Set() });
+      const targetLabel = entry?.targetLabel || "Unknown";
+      const sensorName = entry?.sensorName || "Unknown";
+      const color = entry?.color || "#808080";
+      const key = `${targetLabel}|${sensorName}`;
+      
+      if (!byAircraftSensor.has(key)) {
+        byAircraftSensor.set(key, { color, targetLabel, sensorName, count: 0 });
       }
-      const bucket = byAirline.get(code);
-      if (entry?.targetLabel) bucket.targets.add(String(entry.targetLabel));
+      const bucket = byAircraftSensor.get(key);
+      bucket.count += 1;
     }
 
-    const items = [...byAirline.entries()].sort((a, b) => {
-      const aUnknown = a[0] === "UNKNOWN";
-      const bUnknown = b[0] === "UNKNOWN";
-      if (aUnknown && !bUnknown) return 1;
-      if (!aUnknown && bUnknown) return -1;
-      return a[0].localeCompare(b[0]);
+    const items = [...byAircraftSensor.entries()].sort((a, b) => {
+      const aLabel = a[1].targetLabel;
+      const bLabel = b[1].targetLabel;
+      if (aLabel === bLabel) {
+        return a[1].sensorName.localeCompare(b[1].sensorName);
+      }
+      return aLabel.localeCompare(bLabel);
     });
-    const bodyMarkup = items.map(([code, info]) => {
-      const targets = [...info.targets].sort((a, b) => a.localeCompare(b));
-      const hoverText = targets.length
-        ? targets.join("\n")
-        : "Unknown";
-      const codeLabel = code === "UNKNOWN" ? "Unknown" : code;
+
+    const bodyMarkup = items.map(([key, info]) => {
+      const displayLabel = `${info.targetLabel} (${info.sensorName})`;
       return `
-        <div class="map-legend-item" title="${escapeHtml(hoverText)}">
+        <div class="map-legend-item">
           <span class="map-legend-swatch" style="background:${escapeHtml(info.color)}"></span>
-          <span class="map-legend-code">${escapeHtml(codeLabel)}</span>
-          <span class="map-legend-count">${targets.length}</span>
+          <span class="map-legend-label">${escapeHtml(displayLabel)}</span>
+          <span class="map-legend-count">${info.count}</span>
         </div>
       `;
     }).join("");

@@ -154,6 +154,12 @@
   text-overflow: ellipsis;
 }
 
+.map-legend-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .map-legend-count {
   color: var(--text-dim);
 }
