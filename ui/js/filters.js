@@ -511,7 +511,7 @@ const Filters = (() => {
   function pureWhiteFilterValue() {
     const pureWhite = document.getElementById("f-pure-white");
     if (!pureWhite) return null;
-    return pureWhite.checked ? null : false;
+    return pureWhite.checked ? null : true;
   }
 
   function keepFlNullFilterValue() {
