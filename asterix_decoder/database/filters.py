@@ -247,11 +247,11 @@ class AsterixFilters:
 
         on_ground = filters.get("on_ground")
         if on_ground is False:
-            # Product rule: unchecked ON GROUND removes rows with H(m) <= 0.
+            # Product rule: unchecked ON GROUND removes rows with H(m) <= 0 o N/A.
             h_col = self._col_from(filtered, "H(m)", "H_M")
             if h_col:
                 h_series = pd.to_numeric(filtered[h_col], errors="coerce")
-                filtered = filtered[h_series.isna() | (h_series > 0)]
+                filtered = filtered[~(h_series.isna()) & (h_series > 0)]
 
         pure_white = filters.get("pure_white")
         if pure_white is True:

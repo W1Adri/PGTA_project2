@@ -146,27 +146,27 @@ class Item250(DataItem):
         # ── MCP/FCU Selected Altitude ──────────────────────────────────
         MCP_STATUS   = self._bit(BITS, 1)
         MCP_RAW      = self._bits_range(BITS, 2, 13)
-        MCP_ALTITUDE_FT = str(MCP_RAW * 16).replace(".", ",") if MCP_STATUS else None
+        MCP_ALTITUDE_FT = str(MCP_RAW * 16).replace(".", ",") if MCP_STATUS else "NV"
 
         # ── FMS Selected Altitude ──────────────────────────────────────
         FMS_STATUS   = self._bit(BITS, 14)
         FMS_RAW      = self._bits_range(BITS, 15, 26)
-        FMS_ALTITUDE_FT = str(FMS_RAW * 16).replace(".", ",") if FMS_STATUS else None
+        FMS_ALTITUDE_FT = str(FMS_RAW * 16).replace(".", ",") if FMS_STATUS else "NV"
 
         # ── Barometric Pressure Setting ────────────────────────────────
         BARO_STATUS  = self._bit(BITS, 27)
         BARO_RAW     = self._bits_range(BITS, 28, 39)
-        BARO_SETTING_MB = str(round(BARO_RAW * 0.1 + 800, 1)).replace(".", ",") if BARO_STATUS else None
+        BARO_SETTING_MB = str(round(BARO_RAW * 0.1 + 800, 1)).replace(".", ",") if BARO_STATUS else "NV"
 
         # ── Autopilot Mode Flags ───────────────────────────────────────
         MODE_STATUS = int(self._bit(BITS, 48)) # No global "mode status" bit in BDS 4.0, but we can infer some info from the individual mode flags
-        VNAV_MODE     = int(self._bit(BITS, 49))
-        ALT_HOLD_MODE = int(self._bit(BITS, 50))
-        APPROACH_MODE = int(self._bit(BITS, 51))
+        VNAV_MODE     = int(self._bit(BITS, 49)) if MODE_STATUS else "NV"
+        ALT_HOLD_MODE = int(self._bit(BITS, 50)) if MODE_STATUS else "NV"
+        APPROACH_MODE = int(self._bit(BITS, 51)) if MODE_STATUS else "NV"
 
         # ── Target Altitude Source ─────────────────────────────────────
         TARGET_ALT_SOURCE_STATUS = int(self._bit(BITS, 54))
-        TARGET_ALT_SOURCE_VALUE = self._bits_range(BITS, 55, 56)
+        TARGET_ALT_SOURCE_VALUE = self._bits_range(BITS, 55, 56) if TARGET_ALT_SOURCE_STATUS else "NV" 
 
         return {
             "MCP_STATUS":                 MCP_STATUS,
