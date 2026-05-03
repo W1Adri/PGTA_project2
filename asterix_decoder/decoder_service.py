@@ -29,6 +29,11 @@ _ACTIVE_OFFSETS: tuple[tuple[int, ...], ...] = tuple(
 )
 _HAS_FX: tuple[bool, ...] = tuple(bool(b & 1) for b in range(256))
 
+_STANDARD_BP_MIN = 1013.0
+_STANDARD_BP_MAX = 1013.4
+_MODE_C_STANDARD_BP = 1013.2
+_TRANSITION_FL = 60.0
+
 
 def parse_fspec(data_record: bytes) -> tuple[list[int], bytes]:
     """Return the FRNs present in a record and the remaining data fields."""
@@ -172,6 +177,58 @@ def _split_messages(raw: bytes) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _parse_decimal_value(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(str(value).replace(",", ".").strip())
+    except (ValueError, TypeError):
+        return None
+
+
+def _normalize_target_identification(value: Any) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip().upper()
+    if not normalized or normalized == "NV":
+        return None
+    return normalized
+
+
+def _is_standard_bp(bp_value: float) -> bool:
+    return _STANDARD_BP_MIN <= bp_value <= _STANDARD_BP_MAX
+
+
+def _apply_mode_c_correction(messages_df: pd.DataFrame) -> None:
+    """Compute MODE_C_CORRECTED with per-aircraft previous non-standard BP memory."""
+    previous_non_standard_bp: dict[str, float] = {}
+
+    for record in messages_df["data"]:
+        if not isinstance(record, dict):
+            continue
+
+        fl_value = _parse_decimal_value(record.get("FL"))
+        bp_value = _parse_decimal_value(record.get("BP"))
+        if fl_value is None or bp_value is None or fl_value >= _TRANSITION_FL:
+            continue
+
+        target_id = _normalize_target_identification(record.get("TARGET_IDENTIFICATION"))
+        effective_bp = bp_value
+
+        if _is_standard_bp(bp_value):
+            if target_id is not None:
+                previous_bp = previous_non_standard_bp.get(target_id)
+                if previous_bp is not None:
+                    effective_bp = previous_bp
+        elif target_id is not None:
+            previous_non_standard_bp[target_id] = bp_value
+
+        record["MODE_C_CORRECTED"] = round(
+            fl_value * 100 + (effective_bp - _MODE_C_STANDARD_BP) * 30,
+            2,
+        )
+
+
 # Block 5 — Decode each message into structured fields
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -203,17 +260,7 @@ def _decode_message(
         final_data["LAT"] = lat
         final_data["LON"] = lon
 
-    # ── Derived: corrected Mode-C altitude ────────────────────────────────
-    if FL is not None:
-        BP = final_data.get("BP")
-        if BP is not None and FL < 60:
-            try:
-                # BP might be formatted as '1013,2' from the BDS4.0 decoder
-                bp_val = float(str(BP).replace(",", "."))
-                final_data["MODE_C_CORRECTED"] = round(FL * 100 + (bp_val - 1013.2) * 30, 2)
-            except ValueError:
-                pass
-    else:
+    if FL is None:
         final_data["H(m)"] = 0
         final_data["H(ft)"] = 0
 
@@ -385,6 +432,7 @@ def decode_asterix(
         batch_size=batch_size,
     )
     messages_df["data"] = decoded_rows
+    _apply_mode_c_correction(messages_df)
 
     # Step 5: build final table + apply default filters
     final_df = _build_final_df(messages_df)
