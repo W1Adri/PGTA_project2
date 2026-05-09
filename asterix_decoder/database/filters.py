@@ -247,6 +247,15 @@ class AsterixFilters:
 
         on_ground = filters.get("on_ground")
         if on_ground is False:
+            # CAT021 is exempt from on_ground filter - separate and preserve
+            cat_col = self._col_from(filtered, "CAT", "category")
+            cat021_df = pd.DataFrame()
+            if cat_col:
+                cat021_mask = filtered[cat_col].astype(str).str.contains("CAT021", na=False, regex=False)
+                cat021_df = filtered[cat021_mask]
+                filtered = filtered[~cat021_mask]
+            
+            # Apply on_ground filter only to non-CAT021 records
             # Master Coordinator QA Fix v2: Exclude BOTH explicit "on ground" AND N/A (unknown) values
             # When filtering for airborne (on_ground=False):
             # - Remove rows with STAT_230 = "on ground" (values 1, 3)
@@ -273,6 +282,10 @@ class AsterixFilters:
                 if h_col:
                     h_series = pd.to_numeric(filtered[h_col], errors="coerce")
                     filtered = filtered[~(h_series.isna()) & (h_series > 0)]
+            
+            # Recombine with CAT021 records (which were not filtered)
+            if not cat021_df.empty:
+                filtered = pd.concat([filtered, cat021_df], ignore_index=True)
 
         pure_white = filters.get("pure_white")
         if pure_white is True:
