@@ -29,16 +29,19 @@ class ItemRE(DataItem):
     @extract_octets
     def decode(self, octets: bytes) -> dict[str, any]:
         data = self.data.copy()
-        data["BP"] = None
+        # Distinguish: "N/A" = field not present, "NV" = field present but invalid
         if len(octets) <= 1:
+            data["BP"] = "N/A"  # Field not present in message
             return data
         BP_set = (octets[1]>>7) & 0x1
         if BP_set == 0:
+            data["BP"] = "NV"   # Field present but invalid (status bit = 0)
             return data
         BP = int.from_bytes(octets[2:4], byteorder="big", signed=False)
         return self._bits_to_data(self.data.copy(), BP)
 
     def _bits_to_data(self, data, BP) -> dict[str, any]:
-        data["BP"] = BP*0.1 + 800
+        # Convert raw 12-bit value to millibars (range 0-4095 × 0.1 + 800 = 800-1209.5 mb)
+        data["BP"] = round(BP * 0.1 + 800, 1)
         return data
 

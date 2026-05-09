@@ -247,11 +247,32 @@ class AsterixFilters:
 
         on_ground = filters.get("on_ground")
         if on_ground is False:
-            # Product rule: unchecked ON GROUND removes rows with H(m) <= 0 o N/A.
-            h_col = self._col_from(filtered, "H(m)", "H_M")
-            if h_col:
-                h_series = pd.to_numeric(filtered[h_col], errors="coerce")
-                filtered = filtered[~(h_series.isna()) & (h_series > 0)]
+            # Master Coordinator QA Fix v2: Exclude BOTH explicit "on ground" AND N/A (unknown) values
+            # When filtering for airborne (on_ground=False):
+            # - Remove rows with STAT_230 = "on ground" (values 1, 3)
+            # - Remove rows with STAT_230 = N/A (field not present - unreliable ground status)
+            stat_col = self._col_from(filtered, "STAT_230")
+            if stat_col:
+                # Identify N/A rows (missing field = unknown ground status)
+                is_na = filtered[stat_col].isna()
+                
+                # Identify explicit "on ground" indicators
+                stat_series = filtered[stat_col].astype(str)
+                is_on_ground = stat_series.str.contains(
+                    "on ground",
+                    case=False,
+                    na=False,
+                    regex=False
+                )
+                
+                # Remove both: N/A rows AND "on ground" rows
+                filtered = filtered[~(is_on_ground | is_na)]
+            else:
+                # FALLBACK: If STAT_230 not available, use H(m) as secondary indicator
+                h_col = self._col_from(filtered, "H(m)", "H_M")
+                if h_col:
+                    h_series = pd.to_numeric(filtered[h_col], errors="coerce")
+                    filtered = filtered[~(h_series.isna()) & (h_series > 0)]
 
         pure_white = filters.get("pure_white")
         if pure_white is True:

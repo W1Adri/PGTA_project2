@@ -27,39 +27,42 @@ class Item250(DataItem):
         super().__init__(item_name, length_type)
         self.data = {
             "MODE_S":                     None, # Summary string of decoded BDS registers
+            # BDS 4.0 – Selected Vertical Intention (initialize to N/A if not present)
             "MCP_STATUS":                 None, #
-            "MCP_ALT":                    None, #
+            "MCP_ALT":                    "N/A", # Initialized to N/A; will be NV or value if BDS 4.0 present
             "FMS_STATUS":                 None, #
-            "FMS_ALT":                    None, #
+            "FMS_ALT":                    "N/A", # Initialized to N/A; will be NV or value if BDS 4.0 present
             "BP_STATUS":                  None, # 
-            "BP":                         None, # Baro Pressure
+            "BP":                         "N/A", # Initialized to N/A; will be NV or value if BDS 4.0 present (distinguishes not-present vs invalid)
             "MODE_STATUS":                None, # General mode status (inferred from individual mode flags)
             "VNAV":                       None, # 
             "ALT_HOLD":                   None, #
             "APP":                        None, # Aproach mode
             "TARGET_ALT_STATUS":          None, #
             "TARGET_ALT_SOURCE":          None, #
+            # BDS 5.0 – Track and Turn Report (initialize to N/A if not present)
             "RA_STATUS":                   None, # Roll Angle status
-            "RA":                         None, # Roll Angle
+            "RA":                         "N/A", # Initialized to N/A; will be NV or value if BDS 5.0 present
             "TTA_STATUS":                  None, # True Track Angle status
-            "TTA":                        None, # True Track Angle degree
+            "TTA":                        "N/A", # Initialized to N/A; will be NV or value if BDS 5.0 present
             "GS_STATUS":                   None, # Ground Speed status
-            "GS":                         None, # Ground Speed kt
+            "GS":                         "N/A", # Initialized to N/A; will be NV or value if BDS 5.0 present
             "TAR_STATUS":                  None, # Track Angle Rate status
-            "TAR":                        None, # Track Angle Rate degree/s
+            "TAR":                        "N/A", # Initialized to N/A; will be NV or value if BDS 5.0 present
             "TAS_STATUS":                  None, # True Airspeed status
-            "TAS":                         None, # True Airspeed kt
+            "TAS":                         "N/A", # Initialized to N/A; will be NV or value if BDS 5.0 present
+            # BDS 6.0 – Heading and Speed Report (initialize to N/A if not present)
             "HDG_STATUS":                  None, # Magnetic Heading status
-            "HDG":                          None, # Magnetic Heading degree [-180 - 180]
+            "HDG":                          "N/A", # Initialized to N/A; will be NV or value if BDS 6.0 present
             "IAS_STATUS":                 None, # Indicated Airspeed status
-            "IAS":                          None, # Indicated Airspeed kt
+            "IAS":                          "N/A", # Initialized to N/A; will be NV or value if BDS 6.0 present
             "MACH_STATUS":                 None, # Mach Number status
-            "MACH":                         None, #
-            "MACH_NUMBER":                 None, # Mach Number
+            "MACH":                         "N/A", #
+            "MACH_NUMBER":                 "N/A", # Initialized to N/A; will be NV or value if BDS 6.0 present
             "BAR_STATUS":                  None, # Barometric Altitude Rate status
-            "BAR":                          None, # Barometric Altitude Rate ft/min
+            "BAR":                          "N/A", # Initialized to N/A; will be NV or value if BDS 6.0 present
             "IVV_STATUS":                  None, # Inertial Vertical Velocity status
-            "IVV":                          None, # Inertial Vertical Velocity ft/min
+            "IVV":                          "N/A", # Initialized to N/A; will be NV or value if BDS 6.0 present
         }
 
     @extract_octets

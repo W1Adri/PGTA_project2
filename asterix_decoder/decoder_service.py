@@ -200,7 +200,22 @@ def _is_standard_bp(bp_value: float) -> bool:
 
 
 def _apply_mode_c_correction(messages_df: pd.DataFrame) -> None:
-    """Compute MODE_C_CORRECTED with per-aircraft previous non-standard BP memory."""
+    """
+    Compute MODE_C_CORRECTED with per-aircraft previous non-standard BP memory.
+    
+    Algorithm (ICAO Annex 10 C.3.9.2.1):
+    - When aircraft reports FL < 60 and BP switches from non-standard (e.g., 1014 mb)
+      to standard (1013-1013.4 mb), we use the PREVIOUS BP value
+    - This ensures altitude consistency with ATC's standard pressure calculations
+    - Prevents erratic altitude changes that would appear to ATC
+    
+    Example (BAW47C case):
+    - Msg N-1: FL=50.5, BP=1014 → stored as previous_bp["BAW47C"]=1014
+    - Msg N: FL=35.75, BP=1013 (standard) → use BP=1014 instead
+    - Result: MODE_C_CORRECTED = 35.75*100 + (1014-1013.2)*30 = 3599.0
+    
+    Note: Messages are processed in their order from the ASTERIX stream.
+    """
     previous_non_standard_bp: dict[str, float] = {}
 
     for record in messages_df["data"]:
@@ -308,10 +323,30 @@ def _build_final_df(messages_df: pd.DataFrame) -> pd.DataFrame:
     target_cols = unique_cols
 
     # Build rows from decoded dicts
+    # Define BDS fields that should be "N/A" for CAT048 records without Item250
+    BDS_FIELDS = {
+        "MCP_STATUS", "MCP_ALT", "FMS_STATUS", "FMS_ALT", 
+        "BP_STATUS", "BP", "MODE_STATUS", "VNAV", "ALT_HOLD", "APP",
+        "TARGET_ALT_STATUS", "TARGET_ALT_SOURCE",
+        "RA_STATUS", "RA", "TTA_STATUS", "TTA",
+        "GS_STATUS", "GS", "TAR_STATUS", "TAR", "TAS_STATUS", "TAS",
+        "HDG_STATUS", "HDG", "IAS_STATUS", "IAS",
+        "MACH_STATUS", "MACH", "BAR_STATUS", "BAR", "IVV_STATUS", "IVV",
+    }
+    
     rows = []
-    for r in messages_df.itertuples(index=False):
+    for idx, r in enumerate(messages_df.itertuples(index=False)):
         data_dict = r.data if isinstance(r.data, dict) else {}
+        cat = r.cat if hasattr(r, 'cat') else None
         row_out = {col: data_dict.get(col, None) for col in target_cols[1:]}
+        
+        # For CAT048 records, fill missing BDS fields with "N/A" (field not present)
+        # This distinguishes from "NV" (field present but invalid) and None (data loss)
+        if cat == 48:
+            for field in BDS_FIELDS:
+                if field in row_out and row_out[field] is None:
+                    row_out[field] = "N/A"
+        
         rows.append(row_out)
 
     final_df = pd.DataFrame(rows, columns=target_cols[1:])

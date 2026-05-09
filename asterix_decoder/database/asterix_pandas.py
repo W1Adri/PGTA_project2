@@ -562,16 +562,36 @@ class AsterixPandas:
     # ── CSV export ────────────────────────────────────────────────────────────
 
     def to_csv_bytes(self) -> bytes:
-        """Serialize the current DataFrame to CSV bytes (European format)."""
+        """
+        Serialize the current DataFrame to CSV bytes (European format).
+        
+        Master Coordinator QA Fix: Preserve "NV" (not valid) vs "N/A" (not available)
+        - "NV" = field present but invalid status bit (e.g., BP_STATUS=0)
+        - "N/A" = field not present in message (None/NaN)
+        """
         with self._lock:
             buf = io.BytesIO()
             current_df = self._current_df()
-            current_df.to_csv(
+            
+            # Create a copy to avoid modifying original
+            export_df = current_df.copy()
+            
+            # Replace NaN with "N/A", but preserve string values including "NV"
+            # Step 1: Replace NaN with "N/A" string
+            export_df = export_df.fillna("N/A")
+            
+            # Step 2: Convert all columns to string to ensure NaN→"N/A" is preserved
+            # This handles mixed-type columns where NaN might persist
+            export_df = export_df.astype(str)
+            
+            # Step 3: Replace the Python string "nan" (from None/NaN conversion) with "N/A"
+            export_df = export_df.replace("nan", "N/A")
+            
+            export_df.to_csv(
                 buf,
                 index=False,
                 sep=";",
                 decimal=",",
-                na_rep="N/A",
             )
             return buf.getvalue()
 
